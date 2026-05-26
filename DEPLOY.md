@@ -95,6 +95,26 @@ Do **not** upload `.env` to GitHub.
 | Problem | What to check |
 |---------|----------------|
 | Deploy failed | Render **Logs** tab — often a missing env var |
+| **Twilio 11200** | See section below |
 | 403 from Twilio | `PUBLIC_WEBHOOK_BASE_URL` must match your Render URL exactly |
 | No reply | `/health` works? Twilio webhook URL correct? |
 | Slow first reply | Free tier cold start — normal |
+
+### Twilio error 11200 (HTTP retrieval failure)
+
+Twilio could not get a **2xx** response from your webhook in time. Check in this order:
+
+1. **Wake the server** — open `https://ghana-retail-bot.onrender.com/health` in a browser, wait until you see `ok: true`, then send WhatsApp again (free Render sleeps after ~15 min; first message can fail with 11200).
+
+2. **Twilio webhook URL** (Messaging → WhatsApp sandbox):
+   - `https://ghana-retail-bot.onrender.com/webhook/whatsapp`
+   - Method: **POST**
+   - Not ngrok unless you are testing locally.
+
+3. **`PUBLIC_WEBHOOK_BASE_URL` on Render** — base only, **no path**:
+   - Correct: `https://ghana-retail-bot.onrender.com`
+   - Wrong: `https://ghana-retail-bot.onrender.com/webhook/whatsapp` (causes signature fail → 11200)
+
+4. **Render Logs** when you send a message — look for `Rejected webhook: invalid Twilio signature` or crash errors.
+
+5. **Still 11200 on first message only** — cold start + slow reply; send `hi` twice, or upgrade Render plan later.

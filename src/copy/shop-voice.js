@@ -17,10 +17,10 @@ function welcomeMessage() {
   return (
     "hey — I'm your shop assistant. I track stock and sales for you over WhatsApp.\n\n" +
     "here are some examples of what you can tell me:\n" +
-    "• add 20 tins of milo\n" +
-    "• sold 3 milo\n" +
-    "• milo is 8 cedis (set a price)\n" +
     "• what's in stock?\n" +
+    "• add 20 tins of milo\n" +
+    "• milo is 8 cedis (set a price)\n" +
+    "• sold 3 milo\n" +
     "• today's sales\n" +
     "• alert me when milo is below 5\n\n" +
     "for bulk recording, say 'bulk add' and I'll walk you through it."

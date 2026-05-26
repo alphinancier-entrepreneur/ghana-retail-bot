@@ -25,7 +25,7 @@ async function checkSupabaseConnection() {
   if (error) {
     if (error.code === "42P01") {
       throw new Error(
-        "Connected to Supabase, but tables are missing. Run the SQL migration in supabase/migrations/ first."
+        "Connected to Supabase, but tables are missing. Run all SQL files in supabase/migrations/ (including user_usage + waitlist)."
       );
     }
     throw new Error(`Supabase connection failed: ${error.message}`);

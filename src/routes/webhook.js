@@ -2,6 +2,7 @@ const express = require("express");
 const {
   validateTwilioWebhook,
   createMessagingResponse,
+  buildWebhookUrl,
 } = require("../services/twilio");
 const { parseRetailerMessage, parseBulkInventoryMessage } = require("../services/claude");
 const { executeAction } = require("../handlers/executeAction");
@@ -14,13 +15,27 @@ const {
   handleMenuAction,
   handleGreeting,
 } = require("../handlers/menu");
+const {
+  applyUsageGate,
+  handleWaitlist,
+  isWaitlistKeyword,
+} = require("../handlers/usageGate");
 const voice = require("../copy/shop-voice");
 
 const router = express.Router();
 
+function sendTwiML(res, twiml) {
+  res.type("text/xml");
+  res.send(twiml.toString());
+}
+
 router.post("/whatsapp", async (req, res) => {
   if (!validateTwilioWebhook(req)) {
-    console.warn("Rejected webhook: invalid Twilio signature");
+    console.warn(
+      "Rejected webhook: invalid Twilio signature. URL used for check:",
+      buildWebhookUrl(req),
+      "— set PUBLIC_WEBHOOK_BASE_URL to https://ghana-retail-bot.onrender.com (no /webhook path)"
+    );
     return res.status(403).send("Forbidden");
   }
 
@@ -32,17 +47,31 @@ router.post("/whatsapp", async (req, res) => {
   const twiml = createMessagingResponse();
 
   try {
+    // --- WAITLIST: always works, does not count toward daily limit ---
+    if (body && isWaitlistKeyword(body)) {
+      const waitlistResult = await handleWaitlist(from);
+      twiml.message(waitlistResult.text);
+      return sendTwiML(res, twiml);
+    }
+
+    // --- Daily usage limit (free tier) — admins/testers in UNLIMITED_USERS skip ---
+    const usage = await applyUsageGate(from);
+    if (!usage.proceed) {
+      if (usage.text) {
+        twiml.message(usage.text);
+      }
+      return sendTwiML(res, twiml);
+    }
+
     if (!body) {
       twiml.message(voice.helpMessage());
-      res.type("text/xml");
-      return res.send(twiml.toString());
+      return sendTwiML(res, twiml);
     }
 
     if (isGreeting(body)) {
       const result = await handleGreeting(from);
       twiml.message(result.text);
-      res.type("text/xml");
-      return res.send(twiml.toString());
+      return sendTwiML(res, twiml);
     }
 
     const menuPayload = resolveMenuPayload(body);
@@ -50,8 +79,7 @@ router.post("/whatsapp", async (req, res) => {
       const menuResult = await handleMenuAction(menuPayload, from);
       if (menuResult) {
         twiml.message(menuResult.text);
-        res.type("text/xml");
-        return res.send(twiml.toString());
+        return sendTwiML(res, twiml);
       }
     }
 
@@ -62,8 +90,7 @@ router.post("/whatsapp", async (req, res) => {
       const bulk = await parseBulkInventoryMessage(body);
       const result = await executeBulkAdd(bulk.items, from);
       twiml.message(result.text);
-      res.type("text/xml");
-      return res.send(twiml.toString());
+      return sendTwiML(res, twiml);
     }
 
     const parsed = await parseRetailerMessage(body);
@@ -80,8 +107,7 @@ router.post("/whatsapp", async (req, res) => {
     twiml.message(isTwilioRateLimit ? voice.rateLimitError() : voice.handlerError());
   }
 
-  res.type("text/xml");
-  res.send(twiml.toString());
+  sendTwiML(res, twiml);
 });
 
 module.exports = router;

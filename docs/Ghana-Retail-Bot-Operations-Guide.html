@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Ghana Retail Bot — Operations Guide</title>
+  <style>
+    body { font-family: Segoe UI, Arial, sans-serif; max-width: 700px; margin: 40px auto; line-height: 1.5; color: #222; }
+    h1 { font-size: 1.6em; border-bottom: 2px solid #333; padding-bottom: 8px; }
+    h2 { font-size: 1.2em; margin-top: 1.5em; color: #333; }
+    table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.95em; }
+    th, td { border: 1px solid #ccc; padding: 8px 10px; text-align: left; }
+    th { background: #f5f5f5; }
+    code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+    .note { background: #fff8e6; border-left: 4px solid #e6b800; padding: 10px 14px; margin: 1em 0; }
+    ol, ul { padding-left: 1.4em; }
+    li { margin: 0.4em 0; }
+    footer { margin-top: 2em; font-size: 0.85em; color: #666; }
+  </style>
+</head>
+<body>
+  <h1>Ghana Retail Bot — Operations Guide</h1>
+  <p><strong>Production URL:</strong> https://ghana-retail-bot.onrender.com<br />
+  <strong>Health check:</strong> https://ghana-retail-bot.onrender.com/health<br />
+  <strong>Twilio webhook:</strong> https://ghana-retail-bot.onrender.com/webhook/whatsapp (POST)</p>
+
+  <h2>1. Waking up the bot (cloud / Render)</h2>
+  <p>Use this before shop testing or if WhatsApp feels dead / Twilio shows error <strong>11200</strong>.</p>
+  <ol>
+    <li>Open a browser.</li>
+    <li>Go to: <strong>https://ghana-retail-bot.onrender.com/health</strong></li>
+    <li>Wait until you see: <code>{"ok":true,"service":"ghana-retail-bot"}</code><br />
+      First load after idle can take <strong>30–60 seconds</strong> on the free Render plan.</li>
+    <li>Send <strong>hi</strong> on WhatsApp to your Twilio number.</li>
+    <li>If no reply, wait 30 seconds and send <strong>hi</strong> again once.</li>
+  </ol>
+  <div class="note"><strong>Reminder:</strong> Twilio webhook should stay on Render (not ngrok) while shops are testing. You do <strong>not</strong> need your laptop on — only the browser step wakes Render.</div>
+
+  <h2>2. Test changes locally, then update the cloud</h2>
+  <h3>Option A — Test on your laptop (ngrok)</h3>
+  <div class="note"><strong>Warning:</strong> If you point Twilio at ngrok, shops on the cloud bot stop working until you switch the webhook back to Render.</div>
+  <ol>
+    <li>Edit files in Cursor (e.g. <code>src/copy/shop-voice.js</code>).</li>
+    <li>Run <code>npm start</code> in the project folder.</li>
+    <li>Start ngrok: <code>ngrok http 3000</code></li>
+    <li>Set local <code>PUBLIC_WEBHOOK_BASE_URL</code> to your https ngrok URL.</li>
+    <li>Twilio webhook → <code>https://YOUR-NGROK-URL/webhook/whatsapp</code> (POST)</li>
+    <li>Test from your phone only.</li>
+    <li><strong>Switch Twilio back</strong> to Render URL when done.</li>
+  </ol>
+
+  <h3>Option B — Update the cloud (recommended)</h3>
+  <ol>
+    <li>Edit code on your laptop.</li>
+    <li><strong>GitHub Desktop:</strong> Commit to main → Push origin</li>
+    <li><strong>Render:</strong> Wait until status is <strong>Live</strong> (2–5 min)</li>
+    <li>Open <code>/health</code> in browser, then test WhatsApp</li>
+  </ol>
+  <p>Twilio webhook stays on Render — no change needed each deploy.</p>
+
+  <h2>3. Environment variable reminder (Render)</h2>
+  <table>
+    <tr><th>Variable</th><th>Value</th></tr>
+    <tr><td><code>PUBLIC_WEBHOOK_BASE_URL</code></td><td><code>https://ghana-retail-bot.onrender.com</code> (no /webhook path)</td></tr>
+    <tr><td>Twilio inbound URL</td><td><code>https://ghana-retail-bot.onrender.com/webhook/whatsapp</code></td></tr>
+  </table>
+
+  <h2>4. Quick reference</h2>
+  <table>
+    <tr><th>Goal</th><th>Action</th></tr>
+    <tr><td>Wake cloud bot</td><td>Browser → /health → WhatsApp hi</td></tr>
+    <tr><td>Ship an update</td><td>Edit → GitHub push → Render Live → /health → test</td></tr>
+    <tr><td>Pilots testing</td><td>Keep Twilio on Render URL only</td></tr>
+  </table>
+
+  <h2>5. Two workflows (summary)</h2>
+  <table>
+    <tr><th></th><th>Testing (laptop)</th><th>Production (cloud)</th></tr>
+    <tr><td>Server</td><td>npm start + ngrok</td><td>Render 24/7</td></tr>
+    <tr><td>Twilio webhook</td><td>ngrok URL (temporary)</td><td>ghana-retail-bot.onrender.com</td></tr>
+    <tr><td>Laptop</td><td>Must be on for ngrok</td><td>Can be off</td></tr>
+  </table>
+
+  <footer>Ghana Retail WhatsApp Bot — keep private. To save as PDF: open this file in Chrome/Edge → Print → Save as PDF.</footer>
+</body>
+</html>

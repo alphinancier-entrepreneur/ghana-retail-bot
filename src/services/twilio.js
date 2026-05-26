@@ -11,15 +11,21 @@ function getTwilioClient() {
   return twilioClient;
 }
 
+function normalizePublicBaseUrl(url) {
+  if (!url) return "";
+  let base = url.trim().replace(/\/$/, "");
+  // Common mistake: pasting the full webhook path into PUBLIC_WEBHOOK_BASE_URL
+  base = base.replace(/\/webhook\/whatsapp$/i, "");
+  return base;
+}
+
 function buildWebhookUrl(req) {
   const { publicWebhookBaseUrl } = loadServerEnv();
   const path = req.originalUrl || req.url;
 
-  if (
-    publicWebhookBaseUrl &&
-    !publicWebhookBaseUrl.includes("your-public-url")
-  ) {
-    return `${publicWebhookBaseUrl.replace(/\/$/, "")}${path}`;
+  const base = normalizePublicBaseUrl(publicWebhookBaseUrl);
+  if (base && !base.includes("your-public-url")) {
+    return `${base}${path}`;
   }
 
   const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";

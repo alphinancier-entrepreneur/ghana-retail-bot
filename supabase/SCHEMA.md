@@ -34,8 +34,8 @@ Full SQL is in `migrations/`. Apply files in filename order in the Supabase SQL 
 
 | Table | Purpose |
 |-------|---------|
-| **twilio_send_log** | Append-only outbound message count for account cap |
-| **twilio_quota_state** | Daily Twilio cap state (warned 90%, hard cap flag) |
+| **twilio_send_log** | Append-only outbound message count per Twilio `account_sid` |
+| **twilio_quota_state** | Per-account Twilio cap state (`account_sid` PK: warned 90%, hard cap flag) |
 | **webhook_events** | Processed Twilio `MessageSid` — prevents duplicate handling on retries |
 
 ## Rules built into the database

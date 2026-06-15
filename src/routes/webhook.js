@@ -68,17 +68,17 @@ router.post("/whatsapp", async (req, res) => {
 
     if (body && isWaitlistKeyword(body)) {
       const waitlistResult = await handleWaitlist(from);
-      await deliverReply(res, { body: waitlistResult.text });
+      await deliverReply(res, { body: waitlistResult.text, messageSid });
       return;
     }
 
     const twilioGate = await checkTwilioCapGate();
     if (twilioGate.blocked) {
-      await deliverReply(res, { body: voice.rateLimitError() });
+      await deliverReply(res, { body: voice.rateLimitError(), messageSid });
       return;
     }
 
-    const reply = createReplySender(res, twilioGate);
+    const reply = createReplySender(res, twilioGate, messageSid);
 
     const usage = await applyUsageGate(from);
     if (!usage.proceed) {
@@ -140,7 +140,7 @@ router.post("/whatsapp", async (req, res) => {
       : voice.handlerError();
 
     try {
-      await deliverReply(res, { body: text });
+      await deliverReply(res, { body: text, messageSid });
     } catch (sendErr) {
       console.error("Could not deliver error reply:", sendErr.message);
       const twiml = createMessagingResponse();

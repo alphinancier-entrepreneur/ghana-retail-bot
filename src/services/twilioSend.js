@@ -35,12 +35,17 @@ function sendTwimlReply(res, body) {
 /**
  * Send reply in webhook response only — counts once toward our Twilio quota tracker.
  */
-async function deliverReply(res, { body }) {
+async function deliverReply(res, { body, messageSid = null }) {
   const text = (body || "").trim();
   sendTwimlReply(res, text);
   if (text) {
     await recordOutboundSend();
   }
+  console.log("reply via twiml", {
+    messageSid: messageSid || null,
+    bytes: text.length,
+    via: "twiml",
+  });
   return { ok: true, via: "twiml" };
 }
 
@@ -65,7 +70,7 @@ async function checkTwilioCapGate() {
 /**
  * Build a one-reply helper that prepends the 90% Twilio warning once (same message).
  */
-function createReplySender(res, gate) {
+function createReplySender(res, gate, messageSid = null) {
   let prepend = gate.prependText || null;
 
   return async (text) => {
@@ -74,7 +79,7 @@ function createReplySender(res, gate) {
       body = prepend + text;
       prepend = null;
     }
-    return deliverReply(res, { body });
+    return deliverReply(res, { body, messageSid });
   };
 }
 

@@ -22,7 +22,12 @@ async function main() {
   });
 
   app.get("/health", (_req, res) => {
-    res.json({ ok: true, service: "ghana-retail-bot" });
+    res.json({
+      ok: true,
+      service: "ghana-retail-bot",
+      commit: process.env.RENDER_GIT_COMMIT || null,
+      replyMode: "twiml",
+    });
   });
 
   app.use("/webhook", webhookRouter);

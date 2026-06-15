@@ -5,20 +5,30 @@ const {
   getTwilioWarningThreshold,
 } = require("../config/twilioQuota");
 
-const SINGLETON_KEY = "default";
+function getAccountSid() {
+  const sid = process.env.TWILIO_ACCOUNT_SID?.trim();
+  if (!sid) {
+    throw new Error(
+      "TWILIO_ACCOUNT_SID is required for quota tracking. Set it in .env or Render environment."
+    );
+  }
+  return sid;
+}
 
 function windowStartIso() {
   return new Date(Date.now() - TWILIO_QUOTA_WINDOW_MS).toISOString();
 }
 
-/** How many outbound messages we logged in the last 24 hours. */
+/** How many outbound messages we logged in the last 24 hours for this Twilio account. */
 async function getOutboundCount24h() {
   const supabase = getSupabase();
   const since = windowStartIso();
+  const accountSid = getAccountSid();
 
   const { count, error } = await supabase
     .from("twilio_send_log")
     .select("id", { count: "exact", head: true })
+    .eq("account_sid", accountSid)
     .gte("sent_at", since);
 
   if (error) throw new Error(error.message);
@@ -27,7 +37,9 @@ async function getOutboundCount24h() {
 
 async function recordOutboundSend() {
   const supabase = getSupabase();
-  const { error } = await supabase.from("twilio_send_log").insert({});
+  const { error } = await supabase
+    .from("twilio_send_log")
+    .insert({ account_sid: getAccountSid() });
   if (error) throw new Error(error.message);
 }
 
@@ -36,7 +48,7 @@ async function getQuotaState() {
   const { data, error } = await supabase
     .from("twilio_quota_state")
     .select("hard_cap_detected_at, warned_90_at")
-    .eq("singleton_key", SINGLETON_KEY)
+    .eq("account_sid", getAccountSid())
     .maybeSingle();
 
   if (error) throw new Error(error.message);
@@ -45,18 +57,28 @@ async function getQuotaState() {
 
 async function markHardCapDetected() {
   const supabase = getSupabase();
-  await supabase
-    .from("twilio_quota_state")
-    .update({ hard_cap_detected_at: new Date().toISOString() })
-    .eq("singleton_key", SINGLETON_KEY);
+  const accountSid = getAccountSid();
+  const { error } = await supabase.from("twilio_quota_state").upsert(
+    {
+      account_sid: accountSid,
+      hard_cap_detected_at: new Date().toISOString(),
+    },
+    { onConflict: "account_sid" }
+  );
+  if (error) throw new Error(error.message);
 }
 
 async function markWarned90() {
   const supabase = getSupabase();
-  await supabase
-    .from("twilio_quota_state")
-    .update({ warned_90_at: new Date().toISOString() })
-    .eq("singleton_key", SINGLETON_KEY);
+  const accountSid = getAccountSid();
+  const { error } = await supabase.from("twilio_quota_state").upsert(
+    {
+      account_sid: accountSid,
+      warned_90_at: new Date().toISOString(),
+    },
+    { onConflict: "account_sid" }
+  );
+  if (error) throw new Error(error.message);
 }
 
 /**
@@ -87,6 +109,7 @@ async function shouldSendTwilio90Warning() {
 }
 
 module.exports = {
+  getAccountSid,
   getOutboundCount24h,
   recordOutboundSend,
   isTwilioAccountCapReached,

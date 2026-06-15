@@ -6,7 +6,7 @@ services:
     name: ghana-retail-bot
     runtime: node
     plan: free
-    buildCommand: npm install
+    buildCommand: npm ci
     startCommand: npm start
     healthCheckPath: /health
     envVars:
@@ -30,3 +30,9 @@ services:
         sync: false
       - key: ANTHROPIC_MODEL
         value: claude-haiku-4-5-20251001
+      - key: DAILY_FREE_LIMIT
+        sync: false
+      - key: UNLIMITED_USERS
+        sync: false
+      - key: TWILIO_DAILY_MESSAGE_CAP
+        sync: false

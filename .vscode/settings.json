@@ -1,0 +1,16 @@
+{
+  "terminal.integrated.cwd": "${workspaceFolder}",
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/.git": true,
+    "agent-transcripts": true,
+    "mcps": true,
+    "terminals": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "agent-transcripts": true,
+    "mcps": true,
+    "terminals": true
+  }
+}

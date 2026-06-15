@@ -17,17 +17,22 @@ const {
 } = require("../handlers/menu");
 const {
   applyUsageGate,
+  confirmLimitNoticeSent,
   handleWaitlist,
   isWaitlistKeyword,
 } = require("../handlers/usageGate");
+const {
+  deliverReply,
+  checkTwilioCapGate,
+  createReplySender,
+  isTwilioRateLimitError,
+} = require("../services/twilioSend");
+const { claimMessage } = require("../services/webhookDedup");
+const { maskPhone } = require("../utils/logSafe");
 const voice = require("../copy/shop-voice");
 
 const router = express.Router();
-
-function sendTwiML(res, twiml) {
-  res.type("text/xml");
-  res.send(twiml.toString());
-}
+const isProduction = process.env.NODE_ENV === "production";
 
 router.post("/whatsapp", async (req, res) => {
   if (!validateTwilioWebhook(req)) {
@@ -41,45 +46,72 @@ router.post("/whatsapp", async (req, res) => {
 
   const from = req.body.From || "";
   const body = (req.body.Body || "").trim();
+  const messageSid = req.body.MessageSid || "";
 
-  console.log(`WhatsApp from ${from}: ${body}`);
-
-  const twiml = createMessagingResponse();
+  if (isProduction) {
+    console.log(`WhatsApp from ${maskPhone(from)} (${body.length} chars)`);
+  } else {
+    console.log(`WhatsApp from ${from}: ${body}`);
+  }
 
   try {
-    // --- WAITLIST: always works, does not count toward daily limit ---
-    if (body && isWaitlistKeyword(body)) {
-      const waitlistResult = await handleWaitlist(from);
-      twiml.message(waitlistResult.text);
-      return sendTwiML(res, twiml);
+    const claim = await claimMessage(messageSid, from);
+    if (claim.duplicate) {
+      if (!isProduction) {
+        console.log(`Duplicate webhook skipped: ${messageSid}`);
+      }
+      const twiml = createMessagingResponse();
+      res.type("text/xml");
+      res.send(twiml.toString());
+      return;
     }
 
-    // --- Daily usage limit (free tier) — admins/testers in UNLIMITED_USERS skip ---
+    if (body && isWaitlistKeyword(body)) {
+      const waitlistResult = await handleWaitlist(from);
+      await deliverReply(res, { body: waitlistResult.text });
+      return;
+    }
+
+    const twilioGate = await checkTwilioCapGate();
+    if (twilioGate.blocked) {
+      await deliverReply(res, { body: voice.rateLimitError() });
+      return;
+    }
+
+    const reply = createReplySender(res, twilioGate);
+
     const usage = await applyUsageGate(from);
     if (!usage.proceed) {
       if (usage.text) {
-        twiml.message(usage.text);
+        const sent = await reply(usage.text);
+        if (sent.ok) {
+          await confirmLimitNoticeSent(usage);
+        }
+      } else {
+        const twiml = createMessagingResponse();
+        res.type("text/xml");
+        res.send(twiml.toString());
       }
-      return sendTwiML(res, twiml);
+      return;
     }
 
     if (!body) {
-      twiml.message(voice.helpMessage());
-      return sendTwiML(res, twiml);
+      await reply(voice.helpMessage());
+      return;
     }
 
     if (isGreeting(body)) {
       const result = await handleGreeting(from);
-      twiml.message(result.text);
-      return sendTwiML(res, twiml);
+      await reply(result.text);
+      return;
     }
 
     const menuPayload = resolveMenuPayload(body);
     if (menuPayload) {
       const menuResult = await handleMenuAction(menuPayload, from);
       if (menuResult) {
-        twiml.message(menuResult.text);
-        return sendTwiML(res, twiml);
+        await reply(menuResult.text);
+        return;
       }
     }
 
@@ -89,25 +121,34 @@ router.post("/whatsapp", async (req, res) => {
     if (session.mode === "awaiting_bulk_inventory") {
       const bulk = await parseBulkInventoryMessage(body);
       const result = await executeBulkAdd(bulk.items, from);
-      twiml.message(result.text);
-      return sendTwiML(res, twiml);
+      await reply(result.text);
+      return;
     }
 
     const parsed = await parseRetailerMessage(body);
     const result = await executeAction(parsed, from);
-    twiml.message(result.text);
+    await reply(result.text);
   } catch (err) {
     const detail = err?.error?.message || err.message;
     console.error("Handler error:", detail);
-    if (process.env.NODE_ENV === "development") {
+    if (!isProduction) {
       console.error(err);
     }
-    const code = err?.code || err?.status;
-    const isTwilioRateLimit = code === 63038 || code === 429;
-    twiml.message(isTwilioRateLimit ? voice.rateLimitError() : voice.handlerError());
-  }
 
-  sendTwiML(res, twiml);
+    const text = isTwilioRateLimitError(err)
+      ? voice.rateLimitError()
+      : voice.handlerError();
+
+    try {
+      await deliverReply(res, { body: text });
+    } catch (sendErr) {
+      console.error("Could not deliver error reply:", sendErr.message);
+      const twiml = createMessagingResponse();
+      twiml.message(text);
+      res.type("text/xml");
+      res.send(twiml.toString());
+    }
+  }
 });
 
 module.exports = router;

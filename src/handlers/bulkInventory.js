@@ -10,7 +10,7 @@ async function executeBulkAdd(items, whatsappFrom) {
   if (!items.length) {
     await setSessionMode(retailer.id, "idle");
     return {
-      text: "I couldn't read any products in that message. Try one product per line, e.g.\n50 tins milo @ 8",
+      text: voice.bulkParseFailed(),
     };
   }
 

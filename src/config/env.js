@@ -56,7 +56,17 @@ function loadServerEnv() {
     requireEnv(name);
   }
 
+  const nodeEnv = process.env.NODE_ENV || "development";
   const publicWebhookBaseUrl = process.env.PUBLIC_WEBHOOK_BASE_URL?.trim() || "";
+
+  if (
+    nodeEnv === "production" &&
+    (!publicWebhookBaseUrl || publicWebhookBaseUrl.includes("your-public-url"))
+  ) {
+    throw new Error(
+      "PUBLIC_WEBHOOK_BASE_URL must be set to your production HTTPS URL (no /webhook path) when NODE_ENV=production."
+    );
+  }
 
   const anthropicModel =
     process.env.ANTHROPIC_MODEL?.trim() || "claude-haiku-4-5-20251001";
@@ -69,9 +79,7 @@ function loadServerEnv() {
     publicWebhookBaseUrl,
     anthropicApiKey: requireEnv("ANTHROPIC_API_KEY"),
     anthropicModel,
-    contentSidWelcome: process.env.TWILIO_CONTENT_SID_WELCOME?.trim() || "",
-    contentSidMoreMenu: process.env.TWILIO_CONTENT_SID_MORE_MENU?.trim() || "",
-    contentSidBulkHelp: process.env.TWILIO_CONTENT_SID_BULK_HELP?.trim() || "",
+    nodeEnv,
   };
 }
 

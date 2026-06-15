@@ -1,16 +1,6 @@
 const twilio = require("twilio");
 const { loadServerEnv } = require("../config/env");
 
-let twilioClient = null;
-
-function getTwilioClient() {
-  if (twilioClient) return twilioClient;
-
-  const { twilioAccountSid, twilioAuthToken } = loadServerEnv();
-  twilioClient = twilio(twilioAccountSid, twilioAuthToken);
-  return twilioClient;
-}
-
 function normalizePublicBaseUrl(url) {
   if (!url) return "";
   let base = url.trim().replace(/\/$/, "");
@@ -46,8 +36,8 @@ function createMessagingResponse() {
 }
 
 module.exports = {
-  getTwilioClient,
   validateTwilioWebhook,
   createMessagingResponse,
   buildWebhookUrl,
+  normalizePublicBaseUrl,
 };

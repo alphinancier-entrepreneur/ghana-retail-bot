@@ -1,18 +1,9 @@
 const { getSupabase } = require("./supabase");
 const {
   DAILY_FREE_LIMIT,
-  USAGE_TIMEZONE,
   getWarningThreshold,
 } = require("../config/usage");
-
-/**
- * Current calendar date in Ghana (GMT+0) as YYYY-MM-DD for daily resets.
- */
-function getGhanaToday() {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: USAGE_TIMEZONE }).format(
-    new Date()
-  );
-}
+const { getGhanaTodayDateString } = require("../utils/ghanaDate");
 
 async function getUsageRow(phoneNumber) {
   const supabase = getSupabase();
@@ -30,7 +21,7 @@ async function getUsageRow(phoneNumber) {
  * If last_reset_date is before today (Ghana), zero the count and clear one-time flags.
  */
 async function getOrResetUsage(phoneNumber) {
-  const today = getGhanaToday();
+  const today = getGhanaTodayDateString();
   const supabase = getSupabase();
   let row = await getUsageRow(phoneNumber);
 
@@ -84,7 +75,7 @@ async function incrementMessageCount(phoneNumber) {
 }
 
 async function markWarned90(phoneNumber) {
-  const today = getGhanaToday();
+  const today = getGhanaTodayDateString();
   const supabase = getSupabase();
   await supabase
     .from("user_usage")
@@ -93,7 +84,7 @@ async function markWarned90(phoneNumber) {
 }
 
 async function markLimitNotice(phoneNumber) {
-  const today = getGhanaToday();
+  const today = getGhanaTodayDateString();
   const supabase = getSupabase();
   await supabase
     .from("user_usage")
@@ -110,25 +101,19 @@ function isWaitlistKeyword(body) {
  * Returns { action: 'allow' | 'block' | 'warn_only', text? }
  */
 async function checkAndRecordUsage(phoneNumber) {
-  const today = getGhanaToday();
+  const today = getGhanaTodayDateString();
   const row = await getOrResetUsage(phoneNumber);
   const warnAt = getWarningThreshold();
 
-  // Already at or over limit — block (limit copy sent once per day)
   if (row.message_count >= DAILY_FREE_LIMIT) {
-    const sendFullNotice = row.limit_notice_on !== today;
-    if (sendFullNotice) {
-      await markLimitNotice(phoneNumber);
-    }
     return {
       action: "block",
-      sendLimitMessage: sendFullNotice,
+      sendLimitMessage: row.limit_notice_on !== today,
     };
   }
 
   const updated = await incrementMessageCount(phoneNumber);
 
-  // Just hit 90% (e.g. 18/20) — warning once per day, no bot processing this turn
   if (
     updated.message_count === warnAt &&
     updated.warned_90_on !== today
@@ -141,7 +126,6 @@ async function checkAndRecordUsage(phoneNumber) {
 }
 
 module.exports = {
-  getGhanaToday,
   getOrResetUsage,
   checkAndRecordUsage,
   isWaitlistKeyword,

@@ -17,11 +17,38 @@ function resolveMenuPayload(body) {
     return "menu_bulk_add";
   }
   if (lower === "check stock" || lower === "stock") return "menu_stock";
-  if (lower === "today's sales" || lower === "todays sales" || lower === "sales") {
+  if (
+    lower === "today's sales" ||
+    lower === "todays sales" ||
+    lower === "sales" ||
+    lower === "cash flow" ||
+    lower === "today's cash flow"
+  ) {
     return "menu_sales";
+  }
+  if (
+    lower === "my expenses" ||
+    lower === "show my expenses" ||
+    lower === "what did i spend today" ||
+    lower === "expenses"
+  ) {
+    return "menu_expenses";
   }
   if (lower === "add stock") return "menu_add";
   if (lower === "record sale" || lower === "record a sale") return "menu_sale";
+  if (lower === "set price" || lower === "set a price" || lower === "price") {
+    return "menu_price";
+  }
+  if (
+    lower === "low stock" ||
+    lower === "set alert" ||
+    lower === "stock alert"
+  ) {
+    return "menu_alert";
+  }
+  if (lower === "log expense" || lower === "log an expense") {
+    return "menu_log_expense";
+  }
 
   return null;
 }
@@ -34,6 +61,15 @@ async function handleMenuAction(payload, whatsappFrom) {
     case "menu_sale":
       return { text: voice.menuSaleHint() };
 
+    case "menu_price":
+      return { text: voice.menuPriceHint() };
+
+    case "menu_alert":
+      return { text: voice.menuAlertHint() };
+
+    case "menu_log_expense":
+      return { text: voice.menuExpenseHint() };
+
     case "menu_bulk_add": {
       const retailer = await getOrCreateRetailer(whatsappFrom);
       await setSessionMode(retailer.id, "awaiting_bulk_inventory");
@@ -45,6 +81,9 @@ async function handleMenuAction(payload, whatsappFrom) {
 
     case "menu_sales":
       return executeAction({ action: "daily_sales" }, whatsappFrom);
+
+    case "menu_expenses":
+      return executeAction({ action: "expense_summary" }, whatsappFrom);
 
     default:
       return null;

@@ -21,7 +21,7 @@ Your bot is a small web server. **Render.com** hosts it for free so it keeps run
 3. In a terminal, from the project folder:
 
 ```powershell
-cd "C:\Users\Asus Gaming\.cursor\projects\empty-window\ghana-retail-bot"
+cd "C:\Users\Asus Gaming\.cursor\projects\ghana-retail-bot"
 git init
 git add .
 git commit -m "Initial commit — Ghana retail WhatsApp bot"
@@ -55,7 +55,12 @@ In the Render service → **Environment** → add each variable (copy values fro
 | `TWILIO_WHATSAPP_NUMBER` | Same as local |
 | `ANTHROPIC_API_KEY` | Same as local |
 | `ANTHROPIC_MODEL` | `claude-haiku-4-5-20251001` (optional) |
-| `PUBLIC_WEBHOOK_BASE_URL` | **After first deploy:** `https://YOUR-SERVICE-NAME.onrender.com` (no trailing slash) |
+| `PUBLIC_WEBHOOK_BASE_URL` | **After first deploy:** `https://YOUR-SERVICE-NAME.onrender.com` (no trailing slash, no `/webhook` path) |
+| `DAILY_FREE_LIMIT` | e.g. `10` — messages per user per day (Ghana midnight reset) |
+| `UNLIMITED_USERS` | Comma-separated phones that skip the limit (testers/admin) |
+| `TWILIO_DAILY_MESSAGE_CAP` | e.g. `50` — Twilio trial account outbound cap |
+
+Remove any old `TWILIO_CONTENT_SID_*` variables — the bot is text-only and does not use them.
 
 Do **not** upload `.env` to GitHub.
 
@@ -118,3 +123,30 @@ Twilio could not get a **2xx** response from your webhook in time. Check in this
 4. **Render Logs** when you send a message — look for `Rejected webhook: invalid Twilio signature` or crash errors.
 
 5. **Still 11200 on first message only** — cold start + slow reply; send `hi` twice, or upgrade Render plan later.
+
+---
+
+## After code updates (migrations)
+
+If the bot fails to start with "tables are missing", run the **new** migration files in Supabase SQL Editor (in order):
+
+1. `supabase/migrations/20260527100000_webhook_dedup.sql`
+2. `supabase/migrations/20260527110000_expenditures_retailer_id.sql`
+
+Then restart the server (`npm start` locally or redeploy on Render).
+
+### Verify locally
+
+```powershell
+cd "C:\Users\Asus Gaming\.cursor\projects\ghana-retail-bot"
+npm test
+npm run verify:twilio
+npm run verify:claude
+npm start
+```
+
+### Verify on Render
+
+- Remove obsolete `TWILIO_CONTENT_SID_*` env vars (bot is text-only).
+- Confirm `DAILY_FREE_LIMIT`, `UNLIMITED_USERS`, `TWILIO_DAILY_MESSAGE_CAP` are set.
+- Open `/health`, then send a WhatsApp test message.

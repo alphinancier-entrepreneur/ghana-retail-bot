@@ -5,3 +5,6 @@ node_modules/
 Thumbs.db
 *.log
 npm-debug.log*
+agent-transcripts/
+mcps/
+terminals/

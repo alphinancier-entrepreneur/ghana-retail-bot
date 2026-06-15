@@ -1,6 +1,10 @@
 const { normalizeWhatsAppPhone } = require("../services/retailer");
 const { isUnlimitedUser } = require("../config/usage");
-const { checkAndRecordUsage, isWaitlistKeyword } = require("../services/usage");
+const {
+  checkAndRecordUsage,
+  isWaitlistKeyword,
+  markLimitNotice,
+} = require("../services/usage");
 const { joinWaitlist } = require("../services/waitlist");
 const usageMessages = require("../copy/usage-messages");
 
@@ -34,18 +38,32 @@ async function applyUsageGate(whatsappFrom) {
   }
 
   if (gate.action === "block") {
-    if (gate.sendLimitMessage) {
-      return { proceed: false, text: usageMessages.usageLimitReached() };
-    }
-    // Full limit copy already sent today — block without repeating
-    return { proceed: false, text: null };
+    const text = gate.sendLimitMessage
+      ? usageMessages.usageLimitReached()
+      : usageMessages.usageLimitReminder();
+    return {
+      proceed: false,
+      text,
+      markLimitAfterSend: gate.sendLimitMessage,
+      phone,
+    };
   }
 
   return { proceed: true };
 }
 
+/**
+ * Call after limit message was delivered successfully (once per day).
+ */
+async function confirmLimitNoticeSent(usageGateResult) {
+  if (usageGateResult?.markLimitAfterSend && usageGateResult?.phone) {
+    await markLimitNotice(usageGateResult.phone);
+  }
+}
+
 module.exports = {
   handleWaitlist,
   applyUsageGate,
+  confirmLimitNoticeSent,
   isWaitlistKeyword,
 };

@@ -3,6 +3,13 @@ function formatMoney(amount, currency = "GHS") {
   return `${currency} ${Number(amount).toFixed(2)}`;
 }
 
+/** Ghana cedis display for cash-flow / expense copy */
+function formatCedis(amount, currency = "GHS") {
+  if (amount == null || Number.isNaN(amount)) return null;
+  if (currency === "GHS") return `GH₵ ${Number(amount).toFixed(2)}`;
+  return formatMoney(amount, currency);
+}
+
 function formatUnitPrice(price, currency = "GHS") {
   if (price == null) return null;
   return `${formatMoney(price, currency)} each`;
@@ -15,61 +22,84 @@ function capitalize(name) {
 
 function welcomeMessage() {
   return (
-    "hey — I'm your shop assistant. I track stock and sales for you over WhatsApp.\n\n" +
+    "hey — i'm your shop assistant. i track stock and sales for you over WhatsApp.\n\n" +
     "here are some examples of what you can tell me:\n" +
     "• what's in stock?\n" +
     "• add 20 tins of milo\n" +
     "• milo is 8 cedis (set a price)\n" +
     "• sold 3 milo\n" +
-    "• today's sales\n" +
+    "• today's sales / cash flow\n" +
+    "• i spent 50 cedis on transport\n" +
     "• alert me when milo is below 5\n\n" +
-    "for bulk recording, say 'bulk add' and I'll walk you through it."
+    "for bulk recording, say 'bulk add' and i'll walk you through it."
   );
 }
 
 function bulkInstructions() {
   return (
-    "Paste your whole delivery in one message, one product per line.\n" +
-    "You can include prices:\n" +
+    "paste your whole delivery in one message, one product per line.\n" +
+    "you can include prices:\n" +
     "50 tins milo @ 8\n" +
     "20 boxes sugar @ 12\n" +
     "10 bag rice\n\n" +
-    "Send it and I'll add everything in one go."
+    "send it and i'll add everything in one go."
+  );
+}
+
+function bulkParseFailed() {
+  return (
+    "couldn't read any products in that message. try one product per line, e.g.\n" +
+    "50 tins milo @ 8"
   );
 }
 
 function helpMessage() {
   return (
-    "Here's what I can help with:\n" +
-    "• record inventory, (e.g. add 20 tins of milk)\n" +
-    "• record sales, (e.g. sold 3 milo)\n" +
-    "• set prices, (e.g. milo is 8 cedis)\n" +
-    "• stock report, (e.g. what's in stock?)\n" +
-    "• sales report, (e.g. today's sales)\n" +
-    "• set inventory watchdog, (e.g. alert me when milo is below 5)\n" +
-    "• bulk add (add many items at once, instead of sending them as separate messages)"
+    "here's what i can help with:\n" +
+    "• record inventory (e.g. add 20 tins of milk)\n" +
+    "• record sales (e.g. sold 3 milo)\n" +
+    "• set prices (e.g. milo is 8 cedis)\n" +
+    "• stock report (e.g. what's in stock?)\n" +
+    "• sales / cash flow (e.g. today's sales)\n" +
+    "• log expenses (e.g. i spent 50 cedis on transport)\n" +
+    "• expense report (e.g. what did i spend today?)\n" +
+    "• set inventory watchdog (e.g. alert me when milo is below 5)\n" +
+    "• bulk add (many items in one message)"
   );
 }
 
 function menuAddHint() {
   return (
-    "Just say what came in — for example:\n" +
+    "just say what came in — for example:\n" +
     "add 20 tins of milo\n" +
     "add 10 boxes sugar @ 12\n\n" +
-    "For many items at once, say: bulk add"
+    "for many items at once, say: bulk add"
   );
 }
 
 function menuSaleHint() {
-  return 'Just say it like: "sold 3 milo" or "sold 2 milo at 5 cedis each".';
+  return 'just say it like: "sold 3 milo" or "sold 2 milo at 5 cedis each".';
 }
 
 function menuPriceHint() {
-  return 'Just say it — for example: "milo is 8 cedis" or "set price of sugar to 12".';
+  return 'just say it — for example: "milo is 8 cedis" or "set price of sugar to 12".';
 }
 
 function menuAlertHint() {
-  return 'Just say it — for example: "alert me when milo is below 5".';
+  return 'just say it — for example: "alert me when milo is below 5".';
+}
+
+function menuExpenseHint() {
+  return (
+    'just say what you spent — for example:\n' +
+    '"i spent 50 cedis on transport"\n' +
+    '"bought goods worth 300 cedis"\n' +
+    '"paid 120 for rent"'
+  );
+}
+
+function expenseMissingHint() {
+  return menuExpenseHint();
 }
 
 function stockLine({ name, quantity, unit, unitSellPrice, threshold, currency }) {
@@ -103,22 +133,22 @@ function recordedSale({
   currency,
 }) {
   const label = capitalize(name);
-  let text = `Got it — ${quantity} ${label} sold.`;
+  let text = `got it — ${quantity} ${label} sold.`;
   if (priceAtSale > 0) {
-    text += ` That's ${formatMoney(priceAtSale, currency)}.`;
+    text += ` that's ${formatMoney(priceAtSale, currency)}.`;
   } else if (unitSellPrice == null) {
-    text += ` No price saved for ${label} yet — say "${name} is 8 cedis" to set one.`;
+    text += ` no price saved for ${label} yet — say "${name} is 8 cedis" to set one.`;
   }
-  text += `\nYou have ${newQty} ${unit} left.`;
+  text += `\nyou have ${newQty} ${unit} left.`;
   return text;
 }
 
 function priceSet({ name, unitSellPrice, currency }) {
-  return `Done — ${capitalize(name)} is now ${formatUnitPrice(unitSellPrice, currency)}.`;
+  return `done — ${capitalize(name)} is now ${formatUnitPrice(unitSellPrice, currency)}.`;
 }
 
 function thresholdSet({ name, threshold }) {
-  return `Got it — I'll let you know when ${capitalize(name)} drops to ${threshold} or below.`;
+  return `got it — i'll let you know when ${capitalize(name)} drops to ${threshold} or below.`;
 }
 
 function lowStockAlert({ name, quantity, unit, threshold }) {
@@ -130,7 +160,7 @@ function bulkSummaryHeader(okCount, total) {
 }
 
 function bulkSummaryOk({ name, addedQty, unit, newQty, unitSellPrice, currency }) {
-  let line = `✓ ${capitalize(name)} — added ${addedQty} ${unit}. We now have ${newQty} ${unit}`;
+  let line = `✓ ${capitalize(name)} — added ${addedQty} ${unit}. you now have ${newQty} ${unit}`;
   const priceStr = formatUnitPrice(unitSellPrice, currency);
   if (priceStr) line += ` (${priceStr})`;
   return line;
@@ -140,15 +170,83 @@ function bulkSummaryFail({ name, reason }) {
   return `✗ ${capitalize(name || "line")} — ${reason}`;
 }
 
-function dailySalesSummary({ lines, totalRevenue, totalItems, count, currency }) {
-  if (count === 0) {
-    return "no sales recorded today yet.";
-  }
+function expenseLoggedOperational({
+  amount,
+  description,
+  todayTotal,
+  currency,
+}) {
+  const label = description ? capitalize(description) : "expense";
   return (
-    `today's sales — ${count} transaction${count === 1 ? "" : "s"}:\n` +
-    lines.join("\n") +
-    `\n\ntotal: ${totalItems} items, ${formatMoney(totalRevenue, currency)}.`
+    `got it — ${formatCedis(amount, currency)} for ${label} logged as a business expense 📝\n` +
+    `running total spent today: ${formatCedis(todayTotal, currency)}`
   );
+}
+
+function expenseLoggedRestock({ amount, description, currency }) {
+  const label = description ? capitalize(description) : "new stock";
+  return (
+    `restock recorded ✅ ${formatCedis(amount, currency)} spent on ${label}.\n` +
+    `don't forget to update your inventory if you added new items!`
+  );
+}
+
+function dailyCashFlowSummary({
+  income,
+  restockTotal,
+  operationalTotal,
+  net,
+  currency,
+  salesCount,
+  expenseCount,
+}) {
+  const hasActivity = salesCount > 0 || expenseCount > 0;
+  if (!hasActivity) {
+    return "no sales or expenses recorded today yet.";
+  }
+
+  return (
+    "📊 today's cash flow\n" +
+    `💰 sales: ${formatCedis(income, currency)}\n` +
+    `📦 restock: ${formatCedis(restockTotal, currency)}\n` +
+    `🏃 operations: ${formatCedis(operationalTotal, currency)}\n` +
+    "─────────────────\n" +
+    `📈 net: ${formatCedis(net, currency)}`
+  );
+}
+
+function expenseSummary({
+  restockTotal,
+  operationalTotal,
+  totalExpenses,
+  restockLines,
+  operationalLines,
+  currency,
+}) {
+  if (totalExpenses === 0) {
+    return "no expenses recorded today yet.";
+  }
+
+  let text = "📝 today's spending\n\n";
+
+  if (restockLines.length) {
+    text += `📦 restock — ${formatCedis(restockTotal, currency)}:\n`;
+    for (const line of restockLines) {
+      text += `• ${capitalize(line.description)} — ${formatCedis(line.amount, currency)}\n`;
+    }
+    text += "\n";
+  }
+
+  if (operationalLines.length) {
+    text += `🏃 operations — ${formatCedis(operationalTotal, currency)}:\n`;
+    for (const line of operationalLines) {
+      text += `• ${capitalize(line.description)} — ${formatCedis(line.amount, currency)}\n`;
+    }
+    text += "\n";
+  }
+
+  text += `total spent today: ${formatCedis(totalExpenses, currency)}`;
+  return text.trim();
 }
 
 function unknownIntent() {
@@ -157,34 +255,34 @@ function unknownIntent() {
 
 function noProductYet({ productName }) {
   return (
-    `We don't have ${productName} in the shop yet. ` +
-    `Add stock first — for example: add 10 ${productName}.`
+    `we don't have ${productName} in the shop yet. ` +
+    `add stock first — for example: add 10 ${productName}.`
   );
 }
 
 function notEnoughStock({ name, current, tried, unit }) {
   return (
-    `We don't have enough ${name} for that sale. ` +
-    `We only have ${current} ${unit} in stock, not ${tried}.`
+    `we don't have enough ${name} for that sale. ` +
+    `we only have ${current} ${unit} in stock, not ${tried}.`
   );
 }
 
 function emptyShop() {
   return (
-    "We don't have anything in stock yet. " +
-    "Add your first items — for example: add 20 tins of milk."
+    "we don't have anything in stock yet. " +
+    "add your first items — for example: add 20 tins of milk."
   );
 }
 
 function noStockMatch({ productName }) {
-  return `We couldn't find ${productName} in our stock list.`;
+  return `we couldn't find ${productName} in our stock list.`;
 }
 
 function rateLimitError() {
   return (
-    "hit my daily message limit, so replies are paused for now 😅\n\n" +
+    "hit the daily message limit on this WhatsApp line, so replies are paused for now 😅\n\n" +
     "everything you sent is saved — nothing lost.\n" +
-    "try again in a few hours and i'll be back."
+    "try again in a few hours (the limit usually resets within 24 hours)."
   );
 }
 
@@ -192,18 +290,17 @@ function handlerError() {
   return "something went wrong on my end — try again in a sec.";
 }
 
-function claudeError() {
-  return "didn't quite catch that — try again?";
-}
-
 module.exports = {
   welcomeMessage,
   bulkInstructions,
+  bulkParseFailed,
   helpMessage,
   menuAddHint,
   menuSaleHint,
   menuPriceHint,
   menuAlertHint,
+  menuExpenseHint,
+  expenseMissingHint,
   stockLine,
   stockHeader,
   addedStock,
@@ -214,7 +311,10 @@ module.exports = {
   bulkSummaryHeader,
   bulkSummaryOk,
   bulkSummaryFail,
-  dailySalesSummary,
+  expenseLoggedOperational,
+  expenseLoggedRestock,
+  dailyCashFlowSummary,
+  expenseSummary,
   unknownIntent,
   noProductYet,
   notEnoughStock,
@@ -222,6 +322,6 @@ module.exports = {
   noStockMatch,
   rateLimitError,
   handlerError,
-  claudeError,
   formatMoney,
+  formatCedis,
 };

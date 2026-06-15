@@ -1,12 +1,5 @@
 const { getSupabase } = require("./supabase");
-
-function getTodayStartIso() {
-  const now = new Date();
-  const start = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0)
-  );
-  return start.toISOString();
-}
+const { getGhanaTodayStartIso } = require("../utils/ghanaDate");
 
 async function recordSale({
   retailerId,
@@ -28,7 +21,7 @@ async function recordSale({
 
 async function getDailySales(retailerId, currency = "GHS") {
   const supabase = getSupabase();
-  const since = getTodayStartIso();
+  const since = getGhanaTodayStartIso();
 
   const { data, error } = await supabase
     .from("sales")
@@ -63,4 +56,4 @@ async function getDailySales(retailerId, currency = "GHS") {
   return { lines, totalRevenue, totalItems, count: rows.length };
 }
 
-module.exports = { recordSale, getDailySales, getTodayStartIso };
+module.exports = { recordSale, getDailySales };

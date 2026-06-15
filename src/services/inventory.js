@@ -133,12 +133,9 @@ async function listStock(retailerId, productName) {
   }));
 }
 
-function buildLowStockAlert(productName, quantity, threshold, alertsOn) {
-  if (!alertsOn || threshold == null) return null;
-  if (quantity <= threshold) {
-    return `Low stock alert: ${productName} is at ${quantity} (your alert level is ${threshold}).`;
-  }
-  return null;
+function shouldShowLowStockAlert(quantity, threshold, alertsOn) {
+  if (!alertsOn || threshold == null) return false;
+  return quantity <= threshold;
 }
 
 module.exports = {
@@ -146,5 +143,5 @@ module.exports = {
   updateStock,
   setLowStockThreshold,
   listStock,
-  buildLowStockAlert,
+  shouldShowLowStockAlert,
 };

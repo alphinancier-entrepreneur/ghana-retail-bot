@@ -1,4 +1,8 @@
-const { getOrCreateRetailer, getRetailerSettings } = require("../services/retailer");
+const {
+  getOrCreateRetailer,
+  getRetailerSettings,
+  normalizeWhatsAppPhone,
+} = require("../services/retailer");
 const {
   findActiveProduct,
   setProductPrice,
@@ -8,7 +12,9 @@ const {
   setLowStockThreshold,
   listStock,
 } = require("../services/inventory");
-const { recordSale, getDailySales } = require("../services/sales");
+const { recordSale } = require("../services/sales");
+const { recordExpenditure, getDailyExpenditures } = require("../services/expenditures");
+const { getDailyCashFlow } = require("../services/cashflow");
 const { addStockForProduct } = require("./stock");
 const voice = require("../copy/shop-voice");
 
@@ -141,16 +147,70 @@ async function executeAction(parsed, whatsappFrom) {
     }
 
     case "daily_sales": {
-      const { lines, totalRevenue, totalItems, count } = await getDailySales(
-        retailer.id,
-        currency
-      );
+      const flow = await getDailyCashFlow(retailer.id, currency);
       return {
-        text: voice.dailySalesSummary({
-          lines,
-          totalRevenue,
-          totalItems,
-          count,
+        text: voice.dailyCashFlowSummary({
+          income: flow.income,
+          restockTotal: flow.expenses.restockTotal,
+          operationalTotal: flow.expenses.operationalTotal,
+          net: flow.net,
+          currency,
+          salesCount: flow.sales.count,
+          expenseCount: flow.expenses.count,
+        }),
+      };
+    }
+
+    case "expense_summary": {
+      const expenses = await getDailyExpenditures(retailer.id);
+      return {
+        text: voice.expenseSummary({
+          restockTotal: expenses.restockTotal,
+          operationalTotal: expenses.operationalTotal,
+          totalExpenses: expenses.totalExpenses,
+          restockLines: expenses.restockLines,
+          operationalLines: expenses.operationalLines,
+          currency,
+        }),
+      };
+    }
+
+    case "log_expense": {
+      if (parsed.price == null || parsed.price <= 0) {
+        return { text: voice.expenseMissingHint() };
+      }
+
+      const phone = normalizeWhatsAppPhone(whatsappFrom);
+      const category = parsed.expenseCategory || "operational";
+      const description =
+        parsed.expenseDescription ||
+        (category === "restock" ? "restock" : "business expense");
+
+      await recordExpenditure({
+        retailerId: retailer.id,
+        phoneNumber: phone,
+        amount: parsed.price,
+        category,
+        description,
+      });
+
+      const today = await getDailyExpenditures(retailer.id);
+
+      if (category === "restock") {
+        return {
+          text: voice.expenseLoggedRestock({
+            amount: parsed.price,
+            description,
+            currency,
+          }),
+        };
+      }
+
+      return {
+        text: voice.expenseLoggedOperational({
+          amount: parsed.price,
+          description,
+          todayTotal: today.totalExpenses,
           currency,
         }),
       };

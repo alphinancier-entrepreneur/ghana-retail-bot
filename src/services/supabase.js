@@ -3,6 +3,14 @@ const { loadSupabaseEnv } = require("../config/env");
 
 let client = null;
 
+const REQUIRED_TABLES = [
+  "retailers",
+  "user_usage",
+  "expenditures",
+  "twilio_send_log",
+  "webhook_events",
+];
+
 function getSupabase() {
   if (client) return client;
 
@@ -20,15 +28,24 @@ function getSupabase() {
 
 async function checkSupabaseConnection() {
   const supabase = getSupabase();
-  const { error } = await supabase.from("retailers").select("id").limit(1);
+  const missing = [];
 
-  if (error) {
-    if (error.code === "42P01") {
-      throw new Error(
-        "Connected to Supabase, but tables are missing. Run all SQL files in supabase/migrations/ (including user_usage + waitlist)."
-      );
+  for (const table of REQUIRED_TABLES) {
+    const { error } = await supabase.from(table).select("*").limit(1);
+    if (error) {
+      if (error.code === "42P01") {
+        missing.push(table);
+      } else {
+        throw new Error(`Supabase connection failed: ${error.message}`);
+      }
     }
-    throw new Error(`Supabase connection failed: ${error.message}`);
+  }
+
+  if (missing.length) {
+    throw new Error(
+      `Connected to Supabase, but tables are missing: ${missing.join(", ")}. ` +
+        "Run all SQL files in supabase/migrations/ in filename order."
+    );
   }
 
   return true;

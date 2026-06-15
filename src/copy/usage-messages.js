@@ -24,6 +24,14 @@ function usageLimitReached() {
   );
 }
 
+/** Shorter repeat if they message again after the full limit notice was already sent */
+function usageLimitReminder() {
+  return (
+    "🔒 You're still at today's free message limit — resets at midnight (Ghana time).\n\n" +
+    "Reply *WAITLIST* for early access to unlimited RetailBot."
+  );
+}
+
 function waitlistAlreadyJoined() {
   return "You're already on the list 🙌 We'll hit you up when it's time.";
 }
@@ -38,6 +46,7 @@ function waitlistJoined() {
 module.exports = {
   usageWarning90,
   usageLimitReached,
+  usageLimitReminder,
   waitlistAlreadyJoined,
   waitlistJoined,
 };

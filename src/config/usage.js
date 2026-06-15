@@ -1,9 +1,14 @@
 /**
  * Free-tier usage limits and admin overrides.
- * Change DAILY_FREE_LIMIT here to adjust the cap for all free users.
+ * Per-user cap cannot exceed Twilio account cap (trial sandbox ≈ 50 / 24h).
  */
 
-const DAILY_FREE_LIMIT = Number(process.env.DAILY_FREE_LIMIT) || 20;
+const { TWILIO_DAILY_MESSAGE_CAP } = require("./twilioQuota");
+
+const DAILY_FREE_LIMIT = Math.min(
+  Number(process.env.DAILY_FREE_LIMIT) || 20,
+  TWILIO_DAILY_MESSAGE_CAP
+);
 
 /** Ghana (GMT+0) — used for daily reset at local midnight */
 const USAGE_TIMEZONE = "Africa/Accra";

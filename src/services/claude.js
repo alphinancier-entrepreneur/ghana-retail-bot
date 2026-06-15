@@ -8,10 +8,14 @@ const ALLOWED_ACTIONS = new Set([
   "record_sale",
   "check_stock",
   "daily_sales",
+  "expense_summary",
+  "log_expense",
   "set_threshold",
   "set_price",
   "unknown",
 ]);
+
+const ALLOWED_EXPENSE_CATEGORIES = new Set(["restock", "operational"]);
 
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
 
@@ -38,6 +42,10 @@ function extractJson(text) {
 function normalizeParsed(raw) {
   const action = ALLOWED_ACTIONS.has(raw?.action) ? raw.action : "unknown";
 
+  const expenseCategory = ALLOWED_EXPENSE_CATEGORIES.has(raw?.expense_category)
+    ? raw.expense_category
+    : null;
+
   return {
     action,
     product: typeof raw?.product === "string" ? raw.product.trim() : null,
@@ -53,6 +61,11 @@ function normalizeParsed(raw) {
     price:
       typeof raw?.price === "number" && !Number.isNaN(raw.price)
         ? raw.price
+        : null,
+    expenseCategory,
+    expenseDescription:
+      typeof raw?.expense_description === "string"
+        ? raw.expense_description.trim()
         : null,
   };
 }
@@ -93,7 +106,11 @@ async function callClaude(system, userMessage, maxTokens = 256) {
 async function parseRetailerMessage(userMessage) {
   const text = await callClaude(SYSTEM_PROMPT, userMessage);
   const parsed = normalizeParsed(extractJson(text));
-  console.log("Claude parsed:", JSON.stringify(parsed));
+  if (process.env.NODE_ENV === "production") {
+    console.log("Claude action:", parsed.action);
+  } else {
+    console.log("Claude parsed:", JSON.stringify(parsed));
+  }
   return parsed;
 }
 
@@ -104,7 +121,11 @@ async function parseBulkInventoryMessage(userMessage) {
     ? raw.items.map(normalizeBulkItem).filter((i) => i.product && i.quantity != null)
     : [];
 
-  console.log("Claude bulk parsed:", items.length, "items");
+  if (process.env.NODE_ENV === "production") {
+    console.log("Claude bulk items:", items.length);
+  } else {
+    console.log("Claude bulk parsed:", items.length, "items");
+  }
   return { action: "bulk_add_inventory", items: items.slice(0, 30) };
 }
 

@@ -2,7 +2,7 @@ const { getOrCreateProduct } = require("../services/products");
 const {
   getOrCreateInventoryRow,
   updateStock,
-  buildLowStockAlert,
+  shouldShowLowStockAlert,
 } = require("../services/inventory");
 const voice = require("../copy/shop-voice");
 
@@ -32,8 +32,7 @@ async function addStockForProduct({
     logAction: "add",
   });
 
-  const alert = buildLowStockAlert(
-    product.name,
+  const alert = shouldShowLowStockAlert(
     Number(updated.quantity_current),
     updated.low_stock_threshold != null
       ? Number(updated.low_stock_threshold)

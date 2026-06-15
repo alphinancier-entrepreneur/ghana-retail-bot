@@ -44,11 +44,14 @@ In **RetailBot-Pro** Twilio Console → **Messaging → Try it out → WhatsApp 
 
 Three settings control how many messages flow. Set them in **local `.env`** (Dev) and **Render Environment** (Pro).
 
+**Open testing (no software caps):** set `DISABLE_USAGE_LIMITS=true`. Every phone can message freely until Twilio itself returns error **63038** (trial daily limit). Per-user caps and the internal `TWILIO_DAILY_MESSAGE_CAP` gate are skipped. Remove or set to `false` when you want limits back for onboarding.
+
 | Variable | Example | What it does |
 |----------|---------|--------------|
-| `DAILY_FREE_LIMIT` | `10` | Per shopkeeper phone: max inbound messages per day that get a full bot reply. Resets at **Ghana midnight**. |
-| `UNLIMITED_USERS` | `+233204256533` | Comma-separated phones that **skip** `DAILY_FREE_LIMIT` (your Pro test number, admins). |
-| `TWILIO_DAILY_MESSAGE_CAP` | `50` | Bot’s **Twilio account** outbound cap (trial ≈ 50 / rolling 24h). Tracked per `TWILIO_ACCOUNT_SID` in Supabase. |
+| `DISABLE_USAGE_LIMITS` | `true` | Skip per-user and internal Twilio cap gates — only Twilio 63038 blocks replies |
+| `DAILY_FREE_LIMIT` | `10` | Per shopkeeper phone: max inbound messages per day that get a full bot reply. Resets at **Ghana midnight**. Ignored when `DISABLE_USAGE_LIMITS=true`. |
+| `UNLIMITED_USERS` | `+233204256533` | Comma-separated phones that **skip** `DAILY_FREE_LIMIT` (testers/admin). Ignored when `DISABLE_USAGE_LIMITS=true`. |
+| `TWILIO_DAILY_MESSAGE_CAP` | `50` | Bot’s internal Twilio account outbound cap. Ignored when `DISABLE_USAGE_LIMITS=true`. |
 
 **Order in code:** unlimited users skip the per-user gate → everyone else counted in `user_usage` → every reply logged once in `twilio_send_log` for that Twilio account.
 
@@ -138,7 +141,7 @@ RetailBot-Pro → WhatsApp sandbox → **When a message comes in** → Render UR
 | No reply | `/health` works? Correct Twilio account webhook? Render logs? |
 | Slow first reply | Free tier cold start |
 | **Twilio 63038** | Daily cap hit — wait ~24h or upgrade trial |
-| Logs show **Outgoing API** | See section below — bot should only use **Reply** (TwiML) |
+| **Reply + Failed** in Twilio logs | See section below — delivery blocked (often 63038) |
 
 ### Twilio error 11200 (HTTP retrieval failure)
 
@@ -148,22 +151,35 @@ RetailBot-Pro → WhatsApp sandbox → **When a message comes in** → Render UR
 4. **Render Logs** — look for `Rejected webhook: invalid Twilio signature` or crashes.
 5. First message only fails — cold start; send twice or upgrade Render later.
 
-### Outgoing API vs Reply (TwiML investigation)
+### Outgoing API vs Reply (WhatsApp sandbox — what the Direction column means)
 
-This bot sends **one reply per message via TwiML** in the webhook response — not the REST API. In Twilio logs you want **Reply** (`outbound-reply`), not **Outgoing API** (`outbound-api`).
+The bot sends **one reply per message via TwiML** in the webhook response. It does **not** call Twilio’s REST `messages.create` API. Render logs (`reply via twiml`) are the ground truth for what your app does.
 
-**If you see Outgoing API on a Pro message:**
+On **WhatsApp sandbox**, Twilio’s Console **Direction** column can look confusing. This is normal:
 
-1. Open the message in Twilio → **Message Details** → **Request Inspector**.
-2. On the **incoming** message: check whether the webhook response body contains TwiML:
-   - Good: `<Response><Message>...</Message></Response>`
-   - Bad: empty `<Response/>` or no webhook response
-3. On the **outbound** message: look for `POST .../Messages.json` — that is a REST send (not from our TwiML-only code).
-4. On **Render → Logs**, send a test message — you should see `reply via twiml` with the `MessageSid`.
-5. Confirm `/health` shows `replyMode: "twiml"` and a `commit` matching your latest GitHub push.
-6. Run `npm run verify:twilio-quota` locally with **Pro** credentials in `.env` temporarily — compare `outbound-api` vs `outbound-reply` counts.
+| Direction | Status | Meaning |
+|-----------|--------|---------|
+| **Outgoing API** | Delivered / Read | **Success** — you got the reply on WhatsApp. This has been normal since your first message. |
+| **Reply** | Failed | **Delivery blocked** — click **Troubleshoot** on that row for the error code (often **63038** daily cap). |
 
-If TwiML is present in the webhook response but Twilio still logs `outbound-api`, check for a duplicate integration (Studio, Function, Messaging Service) on the Pro sender.
+**Outgoing API + Delivered is not a bug.** Do not reconfigure Twilio or change the bot code because of it.
+
+**How to verify the bot is working:**
+
+1. You receive replies on WhatsApp.
+2. Render **Logs** show `reply via twiml` with a `messageSid` for each handled message.
+3. `/health` shows `replyMode: "twiml"` and a `commit` hash.
+4. **One outbound row per inbound** — two Delivered outbounds for one message you sent would mean double-send (bad). You should not see that.
+
+**If a row shows Reply + Failed:**
+
+1. Click **Troubleshoot** on that row in Twilio → note the error code.
+2. **63038** — trial daily cap; wait ~24h or upgrade the Twilio account.
+3. Wake Render first (`/health`) if the first message after idle fails — see 11200 above.
+
+**Message Details in Console:** you may only see **Body** (the message text). That is normal on the simplified view. **Request Inspector** is not always visible — use Render Logs and **Troubleshoot** on failed rows instead.
+
+Run `npm run verify:twilio-quota` to compare outbound counts vs your Supabase tracker and cap.
 
 ---
 

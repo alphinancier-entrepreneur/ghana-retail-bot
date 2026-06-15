@@ -5,6 +5,11 @@
 
 const { TWILIO_DAILY_MESSAGE_CAP } = require("./twilioQuota");
 
+/** When true, skip per-user and internal Twilio cap gates — only Twilio 63038 blocks replies. */
+function isUsageLimitsDisabled() {
+  return /^(true|1|yes)$/i.test(process.env.DISABLE_USAGE_LIMITS || "");
+}
+
 const DAILY_FREE_LIMIT = Math.min(
   Number(process.env.DAILY_FREE_LIMIT) || 20,
   TWILIO_DAILY_MESSAGE_CAP
@@ -41,4 +46,5 @@ module.exports = {
   getUnlimitedUsers,
   isUnlimitedUser,
   getWarningThreshold,
+  isUsageLimitsDisabled,
 };

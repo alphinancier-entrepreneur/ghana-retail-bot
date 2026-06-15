@@ -1,5 +1,5 @@
 const { normalizeWhatsAppPhone } = require("../services/retailer");
-const { isUnlimitedUser } = require("../config/usage");
+const { isUnlimitedUser, isUsageLimitsDisabled } = require("../config/usage");
 const {
   checkAndRecordUsage,
   isWaitlistKeyword,
@@ -25,6 +25,10 @@ async function handleWaitlist(whatsappFrom) {
  * Usage gate: unlimited admins skip; WAITLIST is handled separately in webhook.
  */
 async function applyUsageGate(whatsappFrom) {
+  if (isUsageLimitsDisabled()) {
+    return { proceed: true };
+  }
+
   const phone = normalizeWhatsAppPhone(whatsappFrom);
 
   if (isUnlimitedUser(phone)) {

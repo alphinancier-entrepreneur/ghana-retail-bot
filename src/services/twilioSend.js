@@ -1,5 +1,6 @@
 const { createMessagingResponse } = require("./twilio");
 const voice = require("../copy/shop-voice");
+const { isUsageLimitsDisabled } = require("../config/usage");
 const {
   recordOutboundSend,
   markHardCapDetected,
@@ -53,6 +54,10 @@ async function deliverReply(res, { body, messageSid = null }) {
  * Check account quota before processing. No extra REST message for 90% warning.
  */
 async function checkTwilioCapGate() {
+  if (isUsageLimitsDisabled()) {
+    return { blocked: false, prependText: null };
+  }
+
   const atCap = await isTwilioAccountCapReached();
   if (atCap) {
     await markHardCapDetected();

@@ -36,3 +36,5 @@ services:
         sync: false
       - key: TWILIO_DAILY_MESSAGE_CAP
         sync: false
+      - key: DISABLE_USAGE_LIMITS
+        sync: false

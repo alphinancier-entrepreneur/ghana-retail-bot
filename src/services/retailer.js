@@ -66,6 +66,46 @@ async function setRetailerName(retailerId, name) {
   return data;
 }
 
+/**
+ * Close account without hard-deleting (DB forbids DELETE on retailers).
+ * Archives the phone, clears name, deactivates products, resets session/usage.
+ */
+async function archiveRetailerAccount(retailerId, phone) {
+  const supabase = getSupabase();
+
+  const { error: productsError } = await supabase
+    .from("products")
+    .update({ is_active: false })
+    .eq("retailer_id", retailerId)
+    .eq("is_active", true);
+
+  if (productsError) throw new Error(productsError.message);
+
+  const suffix = retailerId.replace(/-/g, "").slice(0, 8);
+  const archivedPhone = `${phone}.deleted.${suffix}`;
+
+  const { error: retailerError } = await supabase
+    .from("retailers")
+    .update({ phone: archivedPhone, name: null })
+    .eq("id", retailerId);
+
+  if (retailerError) throw new Error(retailerError.message);
+
+  const { error: sessionError } = await supabase.from("retailer_sessions").upsert(
+    {
+      retailer_id: retailerId,
+      mode: "idle",
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "retailer_id" }
+  );
+
+  if (sessionError) throw new Error(sessionError.message);
+
+  await supabase.from("user_usage").delete().eq("phone_number", phone);
+  await supabase.from("waitlist").delete().eq("phone_number", phone);
+}
+
 async function getRetailerSettings(retailerId) {
   const supabase = getSupabase();
   const { data, error } = await supabase
@@ -82,5 +122,6 @@ module.exports = {
   normalizeWhatsAppPhone,
   getOrCreateRetailer,
   setRetailerName,
+  archiveRetailerAccount,
   getRetailerSettings,
 };

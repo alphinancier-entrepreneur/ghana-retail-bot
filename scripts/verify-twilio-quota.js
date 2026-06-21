@@ -10,10 +10,19 @@ const { TWILIO_DAILY_MESSAGE_CAP } = require("../src/config/twilioQuota");
 
 const sid = process.env.TWILIO_ACCOUNT_SID?.trim();
 const token = process.env.TWILIO_AUTH_TOKEN?.trim();
+const whatsappNumber = process.env.TWILIO_WHATSAPP_NUMBER?.trim();
+const publicUrl = process.env.PUBLIC_WEBHOOK_BASE_URL?.trim();
 
 function mask(value, show = 4) {
   if (!value) return "(missing)";
   return `${value.slice(0, show)}...${value.slice(-show)}`;
+}
+
+function detectEnvironment() {
+  if (!publicUrl) return "unknown (set PUBLIC_WEBHOOK_BASE_URL)";
+  if (/onrender\.com/i.test(publicUrl)) return "Pro (Render)";
+  if (/ngrok/i.test(publicUrl) || /localhost/i.test(publicUrl)) return "Dev (local + ngrok)";
+  return `custom (${publicUrl})`;
 }
 
 async function countTwilioOutbound24h(client) {
@@ -23,6 +32,7 @@ async function countTwilioOutbound24h(client) {
   let outboundReply = 0;
   let failed = 0;
   let delivered = 0;
+  const failedMessages = [];
 
   const page = await client.messages.list({
     dateSentAfter: since,
@@ -34,7 +44,17 @@ async function countTwilioOutbound24h(client) {
     if (msg.direction === "outbound-reply") outboundReply += 1;
     if (msg.direction?.startsWith("outbound")) {
       total += 1;
-      if (msg.status === "failed" || msg.status === "undelivered") failed += 1;
+      if (msg.status === "failed" || msg.status === "undelivered") {
+        failed += 1;
+        failedMessages.push({
+          sid: msg.sid,
+          status: msg.status,
+          direction: msg.direction,
+          errorCode: msg.errorCode ?? null,
+          errorMessage: msg.errorMessage ?? null,
+          dateSent: msg.dateSent,
+        });
+      }
       if (
         msg.status === "delivered" ||
         msg.status === "read" ||
@@ -45,7 +65,11 @@ async function countTwilioOutbound24h(client) {
     }
   }
 
-  return { total, outboundApi, outboundReply, failed, delivered, fetched: page.length };
+  failedMessages.sort(
+    (a, b) => new Date(b.dateSent || 0).getTime() - new Date(a.dateSent || 0).getTime()
+  );
+
+  return { total, outboundApi, outboundReply, failed, delivered, fetched: page.length, failedMessages };
 }
 
 async function countSupabaseOutbound24h(accountSid) {
@@ -62,10 +86,74 @@ async function countSupabaseOutbound24h(accountSid) {
   return count || 0;
 }
 
+function printFailedDetails(failedMessages) {
+  if (!failedMessages.length) return;
+
+  console.log("\n--- Failed outbound details (newest first) ---");
+  const show = failedMessages.slice(0, 10);
+  for (const msg of show) {
+    const when = msg.dateSent ? new Date(msg.dateSent).toISOString() : "unknown time";
+    const code = msg.errorCode != null ? msg.errorCode : "(none)";
+    const detail = msg.errorMessage || "(no message)";
+    console.log(
+      `  ${when} | ${msg.direction} | ${msg.status} | error ${code}: ${detail}`
+    );
+  }
+  if (failedMessages.length > show.length) {
+    console.log(`  ... and ${failedMessages.length - show.length} more failed row(s)`);
+  }
+
+  const errorCounts = {};
+  for (const msg of failedMessages) {
+    const key = msg.errorCode != null ? String(msg.errorCode) : "unknown";
+    errorCounts[key] = (errorCounts[key] || 0) + 1;
+  }
+  console.log("\nFailed error codes in window:", errorCounts);
+}
+
+function printDeliveryWarnings(twilioCounts, headroom) {
+  const has63038 = twilioCounts.failedMessages.some((m) => m.errorCode === 63038);
+
+  if (twilioCounts.failed > 0 && twilioCounts.delivered > 0 && twilioCounts.failed >= twilioCounts.delivered) {
+    console.log(
+      "\n*** WARNING: Failed outbounds match or exceed delivered in this window."
+    );
+    console.log(
+      "Twilio is rejecting delivery — internal cap headroom is irrelevant until Twilio accepts sends again."
+    );
+  }
+
+  if (headroom > 0 && has63038) {
+    console.log(
+      "\n*** WARNING: Twilio returned error 63038 while our counter still shows headroom."
+    );
+    console.log(
+      "Twilio enforces its own rolling 24h limit (trial ~50/day, sometimes lower). Our TWILIO_DAILY_MESSAGE_CAP is only a soft gate in the app."
+    );
+  }
+
+  if (has63038) {
+    console.log("\n--- 63038 — what to do ---");
+    console.log("1. Wait for Twilio's rolling 24h window to reset (check Monitor → Logs → Errors for first 63038 time).");
+    console.log("2. Or test on RetailBot-Pro if that subaccount is upgraded and has separate quota.");
+    console.log("3. Or upgrade RetailBot-Dev from trial for higher daily volume.");
+    console.log(
+      "4. Message the WhatsApp number listed above on THIS subaccount — Dev and Pro use different Twilio accounts."
+    );
+  }
+
+  console.log(
+    "\nNote: terminal 'reply via twiml' or Render logs only mean the server returned TwiML — not that WhatsApp delivery succeeded."
+  );
+}
+
 async function main() {
   console.log("--- Twilio quota check (rolling 24h) ---");
   console.log("Account SID:", sid ? mask(sid) : "MISSING");
   console.log("Configured cap (TWILIO_DAILY_MESSAGE_CAP):", TWILIO_DAILY_MESSAGE_CAP);
+  console.log("Environment:", detectEnvironment());
+  console.log("WhatsApp sender (message THIS number in sandbox):", whatsappNumber || "MISSING");
+  console.log("Webhook base:", publicUrl || "MISSING");
 
   if (!sid || !token) {
     console.error("Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in .env");
@@ -76,6 +164,12 @@ async function main() {
   const account = await client.api.accounts(sid).fetch();
   console.log("Account name:", account.friendlyName);
   console.log("Account status:", account.status);
+  console.log(
+    "\nMatch check: text the WhatsApp number above while this webhook base is active in Twilio Console."
+  );
+  console.log(
+    "If Twilio Console errors are on a different subaccount (e.g. Pro vs Dev), quota here will not match."
+  );
 
   const twilioCounts = await countTwilioOutbound24h(client);
   const supabaseCount = await countSupabaseOutbound24h(sid);
@@ -95,7 +189,7 @@ async function main() {
   console.log("Logged outbound:", supabaseCount);
 
   const headroom = TWILIO_DAILY_MESSAGE_CAP - twilioCounts.total;
-  console.log("\n--- Cap headroom ---");
+  console.log("\n--- Cap headroom (app soft gate only) ---");
   console.log(
     headroom > 0
       ? `About ${headroom} outbound messages left vs configured cap (${TWILIO_DAILY_MESSAGE_CAP}).`
@@ -108,11 +202,8 @@ async function main() {
     );
   }
 
-  if (twilioCounts.failed > 0) {
-    console.log(
-      `\nNote: ${twilioCounts.failed} failed outbound(s) in window — click Troubleshoot on Failed rows in Twilio (often 63038).`
-    );
-  }
+  printFailedDetails(twilioCounts.failedMessages);
+  printDeliveryWarnings(twilioCounts, headroom);
 }
 
 main().catch((err) => {

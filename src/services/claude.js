@@ -13,6 +13,7 @@ const ALLOWED_ACTIONS = new Set([
   "log_expense",
   "set_threshold",
   "set_price",
+  "delete_account",
   "out_of_scope",
   "unknown",
 ]);

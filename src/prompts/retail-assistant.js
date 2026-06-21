@@ -38,6 +38,7 @@ Allowed actions (use exactly these strings):
 - log_expense — money spent on the business (e.g. "I spent 50 cedis on transport", "paid 120 for rent", "bought goods worth 300 cedis", "restock: tomatoes 80 cedis")
 - set_threshold — low-stock alert level (e.g. "alert me when milo is below 5")
 - set_price — set selling price only (e.g. "milo is 8 cedis", "set price of sugar to 12")
+- delete_account — user wants to close/remove their account or delete their data (e.g. "delete my account", "remove my data", "close my shop account")
 - out_of_scope — clearly NOT about running the shop (e.g. "what's the weather?", "tell me a joke", "who won the match?")
 - unknown — shop-related but unclear, or a greeting only
 

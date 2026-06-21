@@ -16,6 +16,7 @@ const { recordSale } = require("../services/sales");
 const { recordExpenditure, getDailyExpenditures } = require("../services/expenditures");
 const { getDailyCashFlow } = require("../services/cashflow");
 const { addStockForProduct } = require("./stock");
+const { beginAccountDeletion } = require("./accountDelete");
 const voice = require("../copy/shop-voice");
 
 function resolveSaleTotal(parsed, product) {
@@ -42,6 +43,11 @@ async function executeAction(parsed, whatsappFrom) {
       text: voice.outOfScope(),
       event: { kind: "out_of_scope", mode: "full", facts: {} },
     };
+  }
+
+  if (parsed.action === "delete_account") {
+    const retailer = await getOrCreateRetailer(whatsappFrom);
+    return beginAccountDeletion(retailer.id);
   }
 
   const retailer = await getOrCreateRetailer(whatsappFrom);

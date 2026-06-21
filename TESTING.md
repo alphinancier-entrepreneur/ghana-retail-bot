@@ -87,6 +87,33 @@ Message from a **different WhatsApp number** that is not in `retailers` yet — 
 
 ---
 
+## Account deletion (in-app)
+
+Users can close their shop by messaging **delete my account**. Mariam asks for confirmation before anything is removed.
+
+| Step | Send | What happens |
+| ---- | ---- | ------------ |
+| 1 | `delete my account` | Confirm prompt — reply **DELETE** or **CANCEL** |
+| 2a | `DELETE` | Account archived; phone freed for a fresh shop on the same number |
+| 2b | `CANCEL` | Confirm cancelled; account unchanged |
+| 2c | Any other message (e.g. `Hi`, `sold 3 milo`) | Confirm cancelled silently; message handled normally |
+
+**Stuck after asking to delete?** If you only see delete reminders and normal messages do not work, your session may still be in confirm mode (older builds). Send **CANCEL**, or any normal message after deploying the latest code — both exit confirm mode. Only **DELETE** completes removal.
+
+**Same number after a real delete:** The old row’s phone becomes `+233....deleted.{suffix}`. Your next WhatsApp message creates a **new** retailer → Akwaaba onboarding.
+
+Test the full cycle:
+
+```
+delete my account → DELETE → Hi
+```
+
+Expect the done message, then Akwaaba as a new user.
+
+To reset without deleting (keep your shop), use the archive SQL in [Reset a test user](#reset-a-test-user-replay-onboarding) instead.
+
+---
+
 ## Open testing (unlimited for all numbers)
 
 To skip the bot’s per-user daily cap and internal Twilio cap gate for **every** phone (only Twilio error **63038** can still block replies):

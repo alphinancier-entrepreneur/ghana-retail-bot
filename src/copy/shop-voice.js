@@ -72,7 +72,8 @@ function helpMessage() {
     "• today's sales\n" +
     "• I spent 50 cedis on transport\n" +
     "• alert me when milo is below 5\n" +
-    "• bulk add (many items at once)"
+    "• bulk add (many items at once)\n" +
+    "• delete my account (close your shop on Mariam)"
   );
 }
 
@@ -298,6 +299,35 @@ function handlerError() {
   return "Something went wrong on my end — try that again in a sec.";
 }
 
+function deleteAccountConfirm() {
+  return (
+    "You want to close your Mariam account?\n\n" +
+    "Your shop will be disconnected and your products hidden. " +
+    "Past sales records stay in our system — you won't see them from this WhatsApp.\n\n" +
+    "Reply DELETE to confirm, or CANCEL to keep your account.\n\n" +
+    "Nothing happens until you reply DELETE."
+  );
+}
+
+function deleteAccountReminder() {
+  return (
+    "Still waiting — reply DELETE to close your account, or CANCEL to go back.\n\n" +
+    "Nothing is deleted until you send DELETE."
+  );
+}
+
+function deleteAccountDone() {
+  return (
+    "Done ✅ Your account is closed.\n\n" +
+    "You can message from this same number anytime to start a fresh shop — " +
+    "Mariam will set you up again."
+  );
+}
+
+function deleteAccountCancelled() {
+  return "Okay — your account stays. Nothing changed.";
+}
+
 module.exports = {
   welcomeMessage,
   returningGreeting,
@@ -336,6 +366,10 @@ module.exports = {
   noStockMatch,
   rateLimitError,
   handlerError,
+  deleteAccountConfirm,
+  deleteAccountReminder,
+  deleteAccountDone,
+  deleteAccountCancelled,
   formatMoney,
   formatCedis,
   formatUnitPrice,

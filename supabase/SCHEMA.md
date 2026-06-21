@@ -20,7 +20,7 @@ Full SQL is in `migrations/`. Apply files in filename order in the Supabase SQL 
 
 | Table | Purpose |
 |-------|---------|
-| **retailer_sessions** | Conversation mode (e.g. `awaiting_bulk_inventory`) |
+| **retailer_sessions** | Conversation mode: `idle`, `awaiting_bulk_inventory`, `awaiting_shop_name`, `awaiting_account_delete_confirm` |
 | **user_usage** | Per-phone daily message count (Ghana midnight reset) |
 | **waitlist** | Users who typed WAITLIST when at free limit |
 

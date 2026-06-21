@@ -7,9 +7,18 @@ const {
 const { parseRetailerMessage, parseBulkInventoryMessage } = require("../services/claude");
 const { executeAction } = require("../handlers/executeAction");
 const { executeBulkAdd } = require("../handlers/bulkInventory");
-const { getOrCreateRetailer, setRetailerName } = require("../services/retailer");
+const { getOrCreateRetailer, setRetailerName, normalizeWhatsAppPhone } = require("../services/retailer");
 const { getSession, setSessionMode } = require("../services/session");
 const { composeReply } = require("../services/voiceWriter");
+const {
+  isDeleteAccountIntent,
+  isDeleteConfirm,
+  isDeleteCancel,
+  beginAccountDeletion,
+  finishAccountDeletion,
+  cancelAccountDeletion,
+  abandonAccountDeletion,
+} = require("../handlers/accountDelete");
 const {
   isGreeting,
   isThanks,
@@ -121,10 +130,43 @@ router.post("/whatsapp", async (req, res) => {
       return;
     }
 
-    const reply = createReplySender(res, twilioGate, messageSid);
+    const sendReply = createReplySender(res, twilioGate, messageSid);
+    let deletedConfirmAbandoned = false;
+    const reply = async (text) => {
+      const message = deletedConfirmAbandoned
+        ? `Deletion cancelled.\n\n${text}`
+        : text;
+      if (deletedConfirmAbandoned) deletedConfirmAbandoned = false;
+      return sendReply(message);
+    };
 
     const retailer = await getOrCreateRetailer(from);
-    const session = await getSession(retailer.id);
+    let session = await getSession(retailer.id);
+    const phone = normalizeWhatsAppPhone(from);
+
+    // Account deletion confirm — always allowed (before usage gate).
+    if (session.mode === "awaiting_account_delete_confirm") {
+      if (isDeleteConfirm(body)) {
+        const result = await finishAccountDeletion(retailer.id, phone);
+        await reply(result.text);
+        return;
+      }
+      if (isDeleteCancel(body)) {
+        const result = await cancelAccountDeletion(retailer.id);
+        await reply(result.text);
+        return;
+      }
+      deletedConfirmAbandoned = true;
+      await abandonAccountDeletion(retailer.id);
+      session = await getSession(retailer.id);
+    }
+
+    // Start account deletion — ask for DELETE before doing anything.
+    if (!retailer.isNew && isDeleteAccountIntent(body)) {
+      const result = await beginAccountDeletion(retailer.id);
+      await reply(result.text);
+      return;
+    }
 
     // First-ever message: greet + ask name, or run the command then ask name.
     if (retailer.isNew) {
@@ -177,7 +219,8 @@ router.post("/whatsapp", async (req, res) => {
     }
 
     const result = await handleConversation({ body, from, retailer, session });
-    await reply(await composeReply(result));
+    const text = result.templateOnly ? result.text : await composeReply(result);
+    await reply(text);
   } catch (err) {
     const detail = err?.error?.message || err.message;
     console.error("Handler error:", detail);

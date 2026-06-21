@@ -191,12 +191,16 @@ router.post("/whatsapp", async (req, res) => {
         return;
       }
       await setRetailerName(retailer.id, body);
+      const shopName = body.trim().slice(0, 60);
       const result = {
-        text: voice.shopNameSaved({ shopName: body }),
+        text: voice.shopNameSaved({ shopName }),
         event: {
           kind: "shop_name_saved",
           mode: "full",
-          facts: { shopName: body.trim().slice(0, 60) },
+          facts: {
+            shopName,
+            examples: voice.onboardingExampleLines(),
+          },
         },
       };
       await reply(await composeReply(result));

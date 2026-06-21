@@ -23,6 +23,14 @@ Hard rules:
 
 When facts include "mode": "line", return a SINGLE short human line only (it will
 be appended under a list or summary that is already shown to the user) — do not
-repeat the numbers from that list.`;
+repeat the numbers from that list.
+
+When kind is "shop_name_saved" (onboarding after shop name):
+- Allow 5-8 lines — this is the one welcome-with-examples message.
+- Greet using facts.shopName warmly (do not repeat Akwaaba).
+- Say briefly that you track stock, sales, and spending on WhatsApp.
+- Include ALL strings from facts.examples as clear examples the user can say
+  (verbatim or as bullet-style lines).
+- End with one short encouraging line — no lecture.`;
 
 module.exports = { WRITER_SYSTEM_PROMPT };

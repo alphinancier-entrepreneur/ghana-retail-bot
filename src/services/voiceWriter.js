@@ -45,7 +45,8 @@ async function composeReply(result) {
       kind: event.kind,
       facts: event.facts || {},
     });
-    const prose = await generateProse(payload, { maxTokens: 200 });
+    const maxTokens = event.kind === "shop_name_saved" ? 280 : 200;
+    const prose = await generateProse(payload, { maxTokens });
     logWriter("ok", event.kind, prose.length);
     return prose;
   } catch (err) {

@@ -35,9 +35,27 @@ function askShopName() {
   return "One more thing — what's your shop name? 🙌";
 }
 
+const ONBOARDING_EXAMPLES = [
+  "add 20 tins of milo",
+  "sold 3 milo",
+  "what's in stock?",
+  "I spent 50 cedis on transport",
+];
+
+function onboardingExampleLines() {
+  return [...ONBOARDING_EXAMPLES];
+}
+
 function shopNameSaved({ shopName }) {
   const label = shopName ? capitalize(shopName) : "your shop";
-  return `${label} it is ✅ Let's keep your books straight.`;
+  const bullets = ONBOARDING_EXAMPLES.map((line) => `• ${line}`).join("\n");
+  return (
+    `${label} — love it ✅\n\n` +
+    "I'll track your stock, sales, and spending right here on WhatsApp. " +
+    "Just talk to me like:\n" +
+    `${bullets}\n\n` +
+    "Your books stay straight — you focus on your customers."
+  );
 }
 
 function shopNameSkipped() {
@@ -332,6 +350,7 @@ module.exports = {
   welcomeMessage,
   returningGreeting,
   askShopName,
+  onboardingExampleLines,
   shopNameSaved,
   shopNameSkipped,
   bulkInstructions,

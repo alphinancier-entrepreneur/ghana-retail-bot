@@ -6,8 +6,15 @@ const { setSessionMode } = require("../services/session");
 const GREETING_RE =
   /^(hi|hello|hey|hiya|good\s*(morning|afternoon|evening)|menu|start|help)$/i;
 
+const THANKS_RE =
+  /^(thanks|thank\s*you|thank\s*u|thx|tnx|ty|medaase|meda\s*wo?\s*ase|madaase)\s*[!.]*$/i;
+
 function isGreeting(text) {
   return GREETING_RE.test((text || "").trim());
+}
+
+function isThanks(text) {
+  return THANKS_RE.test((text || "").trim());
 }
 
 function resolveMenuPayload(body) {
@@ -90,14 +97,19 @@ async function handleMenuAction(payload, whatsappFrom) {
   }
 }
 
-async function handleGreeting(whatsappFrom) {
-  return { text: voice.welcomeMessage() };
+async function handleGreeting(retailer) {
+  if (retailer?.isNew) {
+    return { text: voice.welcomeMessage() };
+  }
+  return { text: voice.returningGreeting() };
 }
 
 module.exports = {
   isGreeting,
+  isThanks,
   resolveMenuPayload,
   handleMenuAction,
   handleGreeting,
   GREETING_RE,
+  THANKS_RE,
 };

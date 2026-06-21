@@ -41,13 +41,19 @@ async function addStockForProduct({
   );
 
   const displayUnit = unit || product.unit;
+  const currency = settings.currency || "GHS";
+  const threshold =
+    updated.low_stock_threshold != null
+      ? Number(updated.low_stock_threshold)
+      : null;
+
   let text = voice.addedStock({
     name: product.name,
     addedQty: quantity,
     unit: displayUnit,
     newQty,
     unitSellPrice: product.unitSellPrice,
-    currency: settings.currency || "GHS",
+    currency,
   });
 
   if (alert) {
@@ -55,14 +61,25 @@ async function addStockForProduct({
       name: product.name,
       quantity: Number(updated.quantity_current),
       unit: displayUnit,
-      threshold:
-        updated.low_stock_threshold != null
-          ? Number(updated.low_stock_threshold)
-          : null,
+      threshold,
     })}`;
   }
 
-  return { text, product, newQty, unit: displayUnit };
+  const event = {
+    kind: "stock_added",
+    mode: "full",
+    facts: {
+      item: product.name,
+      addedQty: quantity,
+      unit: displayUnit,
+      total: newQty,
+      price: voice.formatUnitPrice(product.unitSellPrice, currency),
+      lowStock: !!alert,
+      threshold,
+    },
+  };
+
+  return { text, event, product, newQty, unit: displayUnit };
 }
 
 module.exports = { addStockForProduct };

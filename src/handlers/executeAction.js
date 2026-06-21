@@ -31,7 +31,17 @@ function resolveSaleTotal(parsed, product) {
 
 async function executeAction(parsed, whatsappFrom) {
   if (parsed.action === "unknown") {
-    return { text: voice.unknownIntent() };
+    return {
+      text: voice.unknownIntent(),
+      event: { kind: "unknown", mode: "full", facts: {} },
+    };
+  }
+
+  if (parsed.action === "out_of_scope") {
+    return {
+      text: voice.outOfScope(),
+      event: { kind: "out_of_scope", mode: "full", facts: {} },
+    };
   }
 
   const retailer = await getOrCreateRetailer(whatsappFrom);
@@ -52,7 +62,7 @@ async function executeAction(parsed, whatsappFrom) {
         unitSellPrice: parsed.price,
         settings,
       });
-      return { text: result.text };
+      return { text: result.text, event: result.event };
     }
 
     case "record_sale": {
@@ -96,30 +106,36 @@ async function executeAction(parsed, whatsappFrom) {
         priceAtSale,
       });
 
-      let text = voice.recordedSale({
+      const saleThreshold =
+        settings.whatsapp_alerts_on && updated.low_stock_threshold != null
+          ? Number(updated.low_stock_threshold)
+          : null;
+
+      const lowStock = saleThreshold != null && newQty <= saleThreshold;
+
+      const text = voice.recordedSale({
         name: product.name,
         quantity: parsed.quantity,
         unit: product.unit,
         newQty,
-        priceAtSale,
-        unitSellPrice: product.unitSellPrice,
-        currency,
+        threshold: saleThreshold,
       });
 
-      if (
-        settings.whatsapp_alerts_on &&
-        updated.low_stock_threshold != null &&
-        newQty <= Number(updated.low_stock_threshold)
-      ) {
-        text += `\n\n${voice.lowStockAlert({
-          name: product.name,
-          quantity: newQty,
-          unit: product.unit,
-          threshold: Number(updated.low_stock_threshold),
-        })}`;
-      }
-
-      return { text };
+      return {
+        text,
+        event: {
+          kind: "sale_recorded",
+          mode: "full",
+          facts: {
+            item: product.name,
+            soldQty: parsed.quantity,
+            unit: product.unit,
+            remaining: newQty,
+            threshold: saleThreshold,
+            lowStock,
+          },
+        },
+      };
     }
 
     case "check_stock": {
@@ -141,37 +157,82 @@ async function executeAction(parsed, whatsappFrom) {
         })
       );
 
+      const body = `${voice.stockHeader(!!parsed.product)}\n${lines.join("\n")}`;
+      const lowCount = rows.filter(
+        (r) => r.threshold != null && Number(r.quantity) <= Number(r.threshold)
+      ).length;
+
       return {
-        text: `${voice.stockHeader(!!parsed.product)}\n${lines.join("\n")}`,
+        text: body,
+        event: {
+          kind: "stock_list",
+          mode: "wrap",
+          body,
+          facts: { itemCount: rows.length, filtered: !!parsed.product, lowCount },
+        },
       };
     }
 
     case "daily_sales": {
       const flow = await getDailyCashFlow(retailer.id, currency);
+      const body = voice.dailyCashFlowSummary({
+        income: flow.income,
+        restockTotal: flow.expenses.restockTotal,
+        operationalTotal: flow.expenses.operationalTotal,
+        net: flow.net,
+        currency,
+        salesCount: flow.sales.count,
+        expenseCount: flow.expenses.count,
+      });
+
+      const hasActivity = flow.sales.count > 0 || flow.expenses.count > 0;
+      if (!hasActivity) {
+        return { text: body };
+      }
+
       return {
-        text: voice.dailyCashFlowSummary({
-          income: flow.income,
-          restockTotal: flow.expenses.restockTotal,
-          operationalTotal: flow.expenses.operationalTotal,
-          net: flow.net,
-          currency,
-          salesCount: flow.sales.count,
-          expenseCount: flow.expenses.count,
-        }),
+        text: body,
+        event: {
+          kind: "daily_summary",
+          mode: "wrap",
+          body,
+          facts: {
+            sales: voice.formatCedis(flow.income, currency),
+            net: voice.formatCedis(flow.net, currency),
+            salesCount: flow.sales.count,
+            expenseCount: flow.expenses.count,
+          },
+        },
       };
     }
 
     case "expense_summary": {
       const expenses = await getDailyExpenditures(retailer.id);
+      const body = voice.expenseSummary({
+        restockTotal: expenses.restockTotal,
+        operationalTotal: expenses.operationalTotal,
+        totalExpenses: expenses.totalExpenses,
+        restockLines: expenses.restockLines,
+        operationalLines: expenses.operationalLines,
+        currency,
+      });
+
+      if (expenses.totalExpenses === 0) {
+        return { text: body };
+      }
+
       return {
-        text: voice.expenseSummary({
-          restockTotal: expenses.restockTotal,
-          operationalTotal: expenses.operationalTotal,
-          totalExpenses: expenses.totalExpenses,
-          restockLines: expenses.restockLines,
-          operationalLines: expenses.operationalLines,
-          currency,
-        }),
+        text: body,
+        event: {
+          kind: "expense_summary",
+          mode: "wrap",
+          body,
+          facts: {
+            total: voice.formatCedis(expenses.totalExpenses, currency),
+            restock: voice.formatCedis(expenses.restockTotal, currency),
+            operations: voice.formatCedis(expenses.operationalTotal, currency),
+          },
+        },
       };
     }
 
@@ -195,6 +256,7 @@ async function executeAction(parsed, whatsappFrom) {
       });
 
       const today = await getDailyExpenditures(retailer.id);
+      const amountStr = voice.formatCedis(parsed.price, currency);
 
       if (category === "restock") {
         return {
@@ -203,6 +265,11 @@ async function executeAction(parsed, whatsappFrom) {
             description,
             currency,
           }),
+          event: {
+            kind: "expense_restock",
+            mode: "full",
+            facts: { amount: amountStr, description },
+          },
         };
       }
 
@@ -213,6 +280,11 @@ async function executeAction(parsed, whatsappFrom) {
           todayTotal: today.totalExpenses,
           currency,
         }),
+        event: {
+          kind: "expense_operational",
+          mode: "full",
+          facts: { amount: amountStr, description },
+        },
       };
     }
 
@@ -230,6 +302,11 @@ async function executeAction(parsed, whatsappFrom) {
 
       return {
         text: voice.thresholdSet({ name: product.name, threshold: parsed.threshold }),
+        event: {
+          kind: "threshold_set",
+          mode: "full",
+          facts: { item: product.name, threshold: parsed.threshold },
+        },
       };
     }
 
@@ -257,11 +334,22 @@ async function executeAction(parsed, whatsappFrom) {
           unitSellPrice: product.unitSellPrice,
           currency,
         }),
+        event: {
+          kind: "price_set",
+          mode: "full",
+          facts: {
+            item: product.name,
+            price: voice.formatUnitPrice(product.unitSellPrice, currency),
+          },
+        },
       };
     }
 
     default:
-      return { text: voice.unknownIntent() };
+      return {
+        text: voice.unknownIntent(),
+        event: { kind: "unknown", mode: "full", facts: {} },
+      };
   }
 }
 

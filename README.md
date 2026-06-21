@@ -33,6 +33,8 @@ npm start
 
 4. For local WhatsApp testing, set `PUBLIC_WEBHOOK_BASE_URL` to your ngrok HTTPS URL and point Twilio's webhook to `{ngrok-url}/webhook/whatsapp`.
 
+See [TESTING.md](TESTING.md) for the full local → online test flow.
+
 ## Database migrations (apply in order)
 
 1. `20260521000000_initial_schema.sql`

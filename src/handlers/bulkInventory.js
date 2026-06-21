@@ -50,11 +50,17 @@ async function executeBulkAdd(items, whatsappFrom) {
 
   await setSessionMode(retailer.id, "idle");
 
+  const body = voice.bulkSummaryHeader(okCount, items.length) + lines.join("\n");
+  const failed = items.length - okCount;
+
   return {
-    text:
-      voice.bulkSummaryHeader(okCount, items.length) +
-      lines.join("\n") +
-      (okCount > 0 ? "\n\nNice — your stock is updated." : ""),
+    text: body + (okCount > 0 ? "\n\nNice — your stock is updated." : ""),
+    event: {
+      kind: "bulk_added",
+      mode: "wrap",
+      body,
+      facts: { okCount, total: items.length, failed },
+    },
   };
 }
 

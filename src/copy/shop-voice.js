@@ -1,12 +1,11 @@
 function formatMoney(amount, currency = "GHS") {
   if (amount == null || Number.isNaN(amount)) return null;
+  if (currency === "GHS") return `GH₵ ${Number(amount).toFixed(2)}`;
   return `${currency} ${Number(amount).toFixed(2)}`;
 }
 
 /** Ghana cedis display for cash-flow / expense copy */
 function formatCedis(amount, currency = "GHS") {
-  if (amount == null || Number.isNaN(amount)) return null;
-  if (currency === "GHS") return `GH₵ ${Number(amount).toFixed(2)}`;
   return formatMoney(amount, currency);
 }
 
@@ -22,77 +21,86 @@ function capitalize(name) {
 
 function welcomeMessage() {
   return (
-    "hey — i'm your shop assistant. i track stock and sales for you over WhatsApp.\n\n" +
-    "here are some examples of what you can tell me:\n" +
-    "• what's in stock?\n" +
-    "• add 20 tins of milo\n" +
-    "• milo is 8 cedis (set a price)\n" +
-    "• sold 3 milo\n" +
-    "• today's sales / cash flow\n" +
-    "• i spent 50 cedis on transport\n" +
-    "• alert me when milo is below 5\n\n" +
-    "for bulk recording, say 'bulk add' and i'll walk you through it."
+    "Akwaaba! 👋 I'm Mariam — your shop assistant. While you handle your " +
+    "customers, I'll handle the tracking — stock, sales, expenses, all of it, " +
+    "right here on WhatsApp. What's your shop name?"
   );
+}
+
+function returningGreeting() {
+  return "I'm here. Tell me a sale, a new stock, or an expense and I'll log it.";
+}
+
+function askShopName() {
+  return "One more thing — what's your shop name? 🙌";
+}
+
+function shopNameSaved({ shopName }) {
+  const label = shopName ? capitalize(shopName) : "your shop";
+  return `${label} it is ✅ Let's keep your books straight.`;
+}
+
+function shopNameSkipped() {
+  return "No problem — we can name your shop later. Let's get to work.";
 }
 
 function bulkInstructions() {
   return (
-    "paste your whole delivery in one message, one product per line.\n" +
-    "you can include prices:\n" +
+    "Paste your whole delivery in one message, one product per line.\n" +
+    "You can include prices:\n" +
     "50 tins milo @ 8\n" +
     "20 boxes sugar @ 12\n" +
     "10 bag rice\n\n" +
-    "send it and i'll add everything in one go."
+    "Send it and I'll add everything at once 📦"
   );
 }
 
 function bulkParseFailed() {
   return (
-    "couldn't read any products in that message. try one product per line, e.g.\n" +
+    "I couldn't read any products there. One product per line, like:\n" +
     "50 tins milo @ 8"
   );
 }
 
 function helpMessage() {
   return (
-    "here's what i can help with:\n" +
-    "• record inventory (e.g. add 20 tins of milk)\n" +
-    "• record sales (e.g. sold 3 milo)\n" +
-    "• set prices (e.g. milo is 8 cedis)\n" +
-    "• stock report (e.g. what's in stock?)\n" +
-    "• sales / cash flow (e.g. today's sales)\n" +
-    "• log expenses (e.g. i spent 50 cedis on transport)\n" +
-    "• expense report (e.g. what did i spend today?)\n" +
-    "• set inventory watchdog (e.g. alert me when milo is below 5)\n" +
-    "• bulk add (many items in one message)"
+    "I keep your books straight. You can tell me:\n" +
+    "• add 20 tins of milo (new stock)\n" +
+    "• sold 3 milo (a sale)\n" +
+    "• milo is 8 cedis (set a price)\n" +
+    "• what's in stock?\n" +
+    "• today's sales\n" +
+    "• I spent 50 cedis on transport\n" +
+    "• alert me when milo is below 5\n" +
+    "• bulk add (many items at once)"
   );
 }
 
 function menuAddHint() {
   return (
-    "just say what came in — for example:\n" +
+    "Just tell me what came in — like:\n" +
     "add 20 tins of milo\n" +
     "add 10 boxes sugar @ 12\n\n" +
-    "for many items at once, say: bulk add"
+    "For many items at once, say: bulk add"
   );
 }
 
 function menuSaleHint() {
-  return 'just say it like: "sold 3 milo" or "sold 2 milo at 5 cedis each".';
+  return 'Say it like "sold 3 milo" or "sold 2 milo at 5 cedis each".';
 }
 
 function menuPriceHint() {
-  return 'just say it — for example: "milo is 8 cedis" or "set price of sugar to 12".';
+  return 'Say it like "milo is 8 cedis" or "set price of sugar to 12".';
 }
 
 function menuAlertHint() {
-  return 'just say it — for example: "alert me when milo is below 5".';
+  return 'Say it like "alert me when milo is below 5".';
 }
 
 function menuExpenseHint() {
   return (
-    'just say what you spent — for example:\n' +
-    '"i spent 50 cedis on transport"\n' +
+    "Just tell me what you spent — like:\n" +
+    '"I spent 50 cedis on transport"\n' +
     '"bought goods worth 300 cedis"\n' +
     '"paid 120 for rent"'
   );
@@ -104,91 +112,79 @@ function expenseMissingHint() {
 
 function stockLine({ name, quantity, unit, unitSellPrice, threshold, currency }) {
   const label = capitalize(name);
-  let line = `• ${label} — we have ${quantity} ${unit} in stock`;
+  let line = `• ${label} — ${quantity} ${unit} in stock`;
   const priceStr = formatUnitPrice(unitSellPrice, currency);
   if (priceStr) line += ` (${priceStr})`;
-  if (threshold != null) line += ` — we'll warn you below ${threshold}`;
+  if (threshold != null) line += ` — I'll warn you below ${threshold}`;
   return line;
 }
 
 function stockHeader(hasProductFilter) {
-  return hasProductFilter ? "here's what we have:" : "here's what we have in stock:";
+  return hasProductFilter ? "📦 Here's what you have:" : "📦 Here's your stock:";
 }
 
 function addedStock({ name, addedQty, unit, newQty, unitSellPrice, currency }) {
   const label = capitalize(name);
-  let text = `done — ${addedQty} ${unit} of ${label} added.\nyou now have ${newQty} ${unit} in total.`;
+  let text = `${addedQty} ${unit} of ${label} added ✅ You now have ${newQty} ${unit}.`;
   const priceStr = formatUnitPrice(unitSellPrice, currency);
   if (priceStr) text += ` (${priceStr})`;
   return text;
 }
 
-function recordedSale({
-  name,
-  quantity,
-  unit,
-  newQty,
-  priceAtSale,
-  unitSellPrice,
-  currency,
-}) {
+function recordedSale({ name, quantity, unit, newQty, threshold }) {
   const label = capitalize(name);
-  let text = `got it — ${quantity} ${label} sold.`;
-  if (priceAtSale > 0) {
-    text += ` that's ${formatMoney(priceAtSale, currency)}.`;
-  } else if (unitSellPrice == null) {
-    text += ` no price saved for ${label} yet — say "${name} is 8 cedis" to set one.`;
+  let text = `${label} sold ✅ ${newQty} ${unit} left.`;
+  if (threshold != null && newQty <= threshold) {
+    text += `\nThat's getting low — your minimum is ${threshold}.`;
   }
-  text += `\nyou have ${newQty} ${unit} left.`;
   return text;
 }
 
 function priceSet({ name, unitSellPrice, currency }) {
-  return `done — ${capitalize(name)} is now ${formatUnitPrice(unitSellPrice, currency)}.`;
+  return `Done ✅ ${capitalize(name)} is now ${formatUnitPrice(unitSellPrice, currency)}.`;
 }
 
 function thresholdSet({ name, threshold }) {
-  return `got it — i'll let you know when ${capitalize(name)} drops to ${threshold} or below.`;
+  return `Got it ✅ I'll flag ${capitalize(name)} when it drops to ${threshold} or below.`;
 }
 
 function lowStockAlert({ name, quantity, unit, threshold }) {
-  return `heads up — ${name} is running low. only ${quantity} ${unit} left (alert set at ${threshold}).`;
+  return (
+    `⚠️ ${capitalize(name)} is running low — ${quantity} ${unit} left and your ` +
+    `minimum is ${threshold}. Time to restock.`
+  );
 }
 
 function bulkSummaryHeader(okCount, total) {
-  return `done — updated ${okCount} of ${total} line${total === 1 ? "" : "s"}:\n`;
+  return `Done ✅ updated ${okCount} of ${total} line${total === 1 ? "" : "s"}:\n`;
 }
 
 function bulkSummaryOk({ name, addedQty, unit, newQty, unitSellPrice, currency }) {
-  let line = `✓ ${capitalize(name)} — added ${addedQty} ${unit}. you now have ${newQty} ${unit}`;
+  let line = `✅ ${capitalize(name)} — added ${addedQty} ${unit}, now ${newQty} ${unit}`;
   const priceStr = formatUnitPrice(unitSellPrice, currency);
   if (priceStr) line += ` (${priceStr})`;
   return line;
 }
 
 function bulkSummaryFail({ name, reason }) {
-  return `✗ ${capitalize(name || "line")} — ${reason}`;
+  return `⚠️ ${capitalize(name || "line")} — ${reason}`;
 }
 
-function expenseLoggedOperational({
-  amount,
-  description,
-  todayTotal,
-  currency,
-}) {
+function expenseLoggedOperational({ amount, description, currency }) {
   const label = description ? capitalize(description) : "expense";
-  return (
-    `got it — ${formatCedis(amount, currency)} for ${label} logged as a business expense 📝\n` +
-    `running total spent today: ${formatCedis(todayTotal, currency)}`
-  );
+  return `Got it! ${formatCedis(amount, currency)} for ${label} recorded 📝`;
 }
 
 function expenseLoggedRestock({ amount, description, currency }) {
   const label = description ? capitalize(description) : "new stock";
   return (
-    `restock recorded ✅ ${formatCedis(amount, currency)} spent on ${label}.\n` +
-    `don't forget to update your inventory if you added new items!`
+    `Restock recorded ✅ ${formatCedis(amount, currency)} spent on ${label}. ` +
+    "Don't forget to update your inventory if you added new items!"
   );
+}
+
+function summaryClosing() {
+  return "Good day. Your shop worked hard.";
 }
 
 function dailyCashFlowSummary({
@@ -199,19 +195,21 @@ function dailyCashFlowSummary({
   currency,
   salesCount,
   expenseCount,
+  period = "Today's",
 }) {
   const hasActivity = salesCount > 0 || expenseCount > 0;
   if (!hasActivity) {
-    return "no sales or expenses recorded today yet.";
+    return "No sales or expenses recorded today yet.";
   }
 
   return (
-    "📊 today's cash flow\n" +
-    `💰 sales: ${formatCedis(income, currency)}\n` +
-    `📦 restock: ${formatCedis(restockTotal, currency)}\n` +
-    `🏃 operations: ${formatCedis(operationalTotal, currency)}\n` +
+    `📊 ${period} Summary\n` +
+    `💰 Sales: ${formatCedis(income, currency)}\n` +
+    `📦 Restock: ${formatCedis(restockTotal, currency)}\n` +
+    `🏃 Operations: ${formatCedis(operationalTotal, currency)}\n` +
     "─────────────────\n" +
-    `📈 net: ${formatCedis(net, currency)}`
+    `📈 Net: ${formatCedis(net, currency)}\n\n` +
+    summaryClosing()
   );
 }
 
@@ -224,13 +222,13 @@ function expenseSummary({
   currency,
 }) {
   if (totalExpenses === 0) {
-    return "no expenses recorded today yet.";
+    return "No expenses recorded today yet.";
   }
 
-  let text = "📝 today's spending\n\n";
+  let text = "📊 Today's spending\n\n";
 
   if (restockLines.length) {
-    text += `📦 restock — ${formatCedis(restockTotal, currency)}:\n`;
+    text += `📦 Restock — ${formatCedis(restockTotal, currency)}:\n`;
     for (const line of restockLines) {
       text += `• ${capitalize(line.description)} — ${formatCedis(line.amount, currency)}\n`;
     }
@@ -238,60 +236,74 @@ function expenseSummary({
   }
 
   if (operationalLines.length) {
-    text += `🏃 operations — ${formatCedis(operationalTotal, currency)}:\n`;
+    text += `🏃 Operations — ${formatCedis(operationalTotal, currency)}:\n`;
     for (const line of operationalLines) {
       text += `• ${capitalize(line.description)} — ${formatCedis(line.amount, currency)}\n`;
     }
     text += "\n";
   }
 
-  text += `total spent today: ${formatCedis(totalExpenses, currency)}`;
+  text += `Total spent today: ${formatCedis(totalExpenses, currency)}\n\n`;
+  text += summaryClosing();
   return text.trim();
 }
 
 function unknownIntent() {
-  return helpMessage();
+  return (
+    "Hmm, I didn't quite catch that. Did you want to record a sale, check your " +
+    "stock, or log an expense?"
+  );
+}
+
+function outOfScope() {
+  return (
+    "That's a bit outside what I know 😄 I'm best at stock, sales, and keeping " +
+    "your books straight. Want help with any of those?"
+  );
+}
+
+function thankYou() {
+  return "Always 🙌 Your shop won't run itself.";
 }
 
 function noProductYet({ productName }) {
   return (
-    `we don't have ${productName} in the shop yet. ` +
-    `add stock first — for example: add 10 ${productName}.`
+    `You don't have ${productName} in the shop yet. Add it first — like: ` +
+    `add 10 ${productName}.`
   );
 }
 
 function notEnoughStock({ name, current, tried, unit }) {
   return (
-    `we don't have enough ${name} for that sale. ` +
-    `we only have ${current} ${unit} in stock, not ${tried}.`
+    `⚠️ Not enough ${name} for that sale. You have ${current} ${unit}, not ${tried}.`
   );
 }
 
 function emptyShop() {
-  return (
-    "we don't have anything in stock yet. " +
-    "add your first items — for example: add 20 tins of milk."
-  );
+  return "Nothing in stock yet. Add your first items — like: add 20 tins of milk.";
 }
 
 function noStockMatch({ productName }) {
-  return `we couldn't find ${productName} in our stock list.`;
+  return `I couldn't find ${productName} in your stock list.`;
 }
 
 function rateLimitError() {
   return (
-    "hit the daily message limit on this WhatsApp line, so replies are paused for now 😅\n\n" +
-    "everything you sent is saved — nothing lost.\n" +
-    "try again in a few hours (the limit usually resets within 24 hours)."
+    "This WhatsApp line hit its daily message limit, so replies are paused for now.\n\n" +
+    "Everything you sent is saved — nothing lost. Try again in a few hours."
   );
 }
 
 function handlerError() {
-  return "something went wrong on my end — try again in a sec.";
+  return "Something went wrong on my end — try that again in a sec.";
 }
 
 module.exports = {
   welcomeMessage,
+  returningGreeting,
+  askShopName,
+  shopNameSaved,
+  shopNameSkipped,
   bulkInstructions,
   bulkParseFailed,
   helpMessage,
@@ -316,6 +328,8 @@ module.exports = {
   dailyCashFlowSummary,
   expenseSummary,
   unknownIntent,
+  outOfScope,
+  thankYou,
   noProductYet,
   notEnoughStock,
   emptyShop,
@@ -324,4 +338,5 @@ module.exports = {
   handlerError,
   formatMoney,
   formatCedis,
+  formatUnitPrice,
 };

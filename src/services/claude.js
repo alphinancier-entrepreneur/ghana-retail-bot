@@ -1,5 +1,6 @@
 const Anthropic = require("@anthropic-ai/sdk");
 const { SYSTEM_PROMPT } = require("../prompts/retail-assistant");
+const { WRITER_SYSTEM_PROMPT } = require("../prompts/mariam-writer");
 const { BULK_SYSTEM_PROMPT } = require("../prompts/bulk-inventory");
 const { loadServerEnv } = require("../config/env");
 
@@ -12,6 +13,7 @@ const ALLOWED_ACTIONS = new Set([
   "log_expense",
   "set_threshold",
   "set_price",
+  "out_of_scope",
   "unknown",
 ]);
 
@@ -103,6 +105,37 @@ async function callClaude(system, userMessage, maxTokens = 256) {
   return textBlock.text;
 }
 
+function stripWrappers(text) {
+  let out = (text || "").trim();
+  // Strip code fences and surrounding quotes the model sometimes adds.
+  out = out.replace(/^```[a-z]*\n?/i, "").replace(/```$/i, "").trim();
+  if (
+    (out.startsWith('"') && out.endsWith('"')) ||
+    (out.startsWith("'") && out.endsWith("'"))
+  ) {
+    out = out.slice(1, -1).trim();
+  }
+  return out;
+}
+
+/**
+ * Second-stage writer: turn computed facts into Mariam's prose.
+ * Resolves to the generated text, or throws on timeout/empty/error so the
+ * caller can fall back to a template.
+ */
+async function generateProse(userContent, { maxTokens = 200, timeoutMs = 4000 } = {}) {
+  const work = callClaude(WRITER_SYSTEM_PROMPT, userContent, maxTokens);
+  const text = await Promise.race([
+    work,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("writer timeout")), timeoutMs)
+    ),
+  ]);
+  const clean = stripWrappers(text);
+  if (!clean) throw new Error("writer returned empty text");
+  return clean;
+}
+
 async function parseRetailerMessage(userMessage) {
   const text = await callClaude(SYSTEM_PROMPT, userMessage);
   const parsed = normalizeParsed(extractJson(text));
@@ -132,5 +165,6 @@ async function parseBulkInventoryMessage(userMessage) {
 module.exports = {
   parseRetailerMessage,
   parseBulkInventoryMessage,
+  generateProse,
   ALLOWED_ACTIONS,
 };

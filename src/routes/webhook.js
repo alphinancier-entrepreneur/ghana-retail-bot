@@ -7,13 +7,14 @@ const {
 const { parseRetailerMessage, parseBulkInventoryMessage } = require("../services/claude");
 const { executeAction } = require("../handlers/executeAction");
 const { executeBulkAdd } = require("../handlers/bulkInventory");
-const { getOrCreateRetailer } = require("../services/retailer");
-const { getSession } = require("../services/session");
+const { getOrCreateRetailer, setRetailerName } = require("../services/retailer");
+const { getSession, setSessionMode } = require("../services/session");
+const { composeReply } = require("../services/voiceWriter");
 const {
   isGreeting,
+  isThanks,
   resolveMenuPayload,
   handleMenuAction,
-  handleGreeting,
 } = require("../handlers/menu");
 const {
   applyUsageGate,
@@ -33,6 +34,48 @@ const voice = require("../copy/shop-voice");
 
 const router = express.Router();
 const isProduction = process.env.NODE_ENV === "production";
+
+/**
+ * Resolve a normal (non-onboarding) message into a reply result
+ * ({ text, event? }). Numbers/templates are produced here; the caller runs it
+ * through composeReply so Mariam's voice (or the template fallback) is applied.
+ */
+async function handleConversation({ body, from, retailer, session }) {
+  if (!body) {
+    return { text: voice.helpMessage() };
+  }
+
+  if (isThanks(body)) {
+    return { text: voice.thankYou(), event: { kind: "thanks", mode: "full", facts: {} } };
+  }
+
+  if (isGreeting(body)) {
+    return {
+      text: voice.returningGreeting(),
+      event: {
+        kind: "returning_greeting",
+        mode: "full",
+        facts: { shopName: retailer?.name || null },
+      },
+    };
+  }
+
+  const menuPayload = resolveMenuPayload(body);
+  if (menuPayload) {
+    const menuResult = await handleMenuAction(menuPayload, from);
+    if (menuResult) {
+      return menuResult;
+    }
+  }
+
+  if (session.mode === "awaiting_bulk_inventory") {
+    const bulk = await parseBulkInventoryMessage(body);
+    return executeBulkAdd(bulk.items, from);
+  }
+
+  const parsed = await parseRetailerMessage(body);
+  return executeAction(parsed, from);
+}
 
 router.post("/whatsapp", async (req, res) => {
   if (!validateTwilioWebhook(req)) {
@@ -80,6 +123,44 @@ router.post("/whatsapp", async (req, res) => {
 
     const reply = createReplySender(res, twilioGate, messageSid);
 
+    const retailer = await getOrCreateRetailer(from);
+    const session = await getSession(retailer.id);
+
+    // First-ever message: greet + ask name, or run the command then ask name.
+    if (retailer.isNew) {
+      if (!body || isGreeting(body)) {
+        await setSessionMode(retailer.id, "awaiting_shop_name");
+        await reply(voice.welcomeMessage());
+        return;
+      }
+
+      const result = await handleConversation({ body, from, retailer, session });
+      const message = await composeReply(result);
+      await setSessionMode(retailer.id, "awaiting_shop_name");
+      await reply(`${message}\n\n${voice.askShopName()}`);
+      return;
+    }
+
+    // We previously asked for the shop name; capture this reply as the name.
+    if (session.mode === "awaiting_shop_name") {
+      await setSessionMode(retailer.id, "idle");
+      if (!body || /^skip$/i.test(body)) {
+        await reply(voice.shopNameSkipped());
+        return;
+      }
+      await setRetailerName(retailer.id, body);
+      const result = {
+        text: voice.shopNameSaved({ shopName: body }),
+        event: {
+          kind: "shop_name_saved",
+          mode: "full",
+          facts: { shopName: body.trim().slice(0, 60) },
+        },
+      };
+      await reply(await composeReply(result));
+      return;
+    }
+
     const usage = await applyUsageGate(from);
     if (!usage.proceed) {
       if (usage.text) {
@@ -95,39 +176,8 @@ router.post("/whatsapp", async (req, res) => {
       return;
     }
 
-    if (!body) {
-      await reply(voice.helpMessage());
-      return;
-    }
-
-    if (isGreeting(body)) {
-      const result = await handleGreeting(from);
-      await reply(result.text);
-      return;
-    }
-
-    const menuPayload = resolveMenuPayload(body);
-    if (menuPayload) {
-      const menuResult = await handleMenuAction(menuPayload, from);
-      if (menuResult) {
-        await reply(menuResult.text);
-        return;
-      }
-    }
-
-    const retailer = await getOrCreateRetailer(from);
-    const session = await getSession(retailer.id);
-
-    if (session.mode === "awaiting_bulk_inventory") {
-      const bulk = await parseBulkInventoryMessage(body);
-      const result = await executeBulkAdd(bulk.items, from);
-      await reply(result.text);
-      return;
-    }
-
-    const parsed = await parseRetailerMessage(body);
-    const result = await executeAction(parsed, from);
-    await reply(result.text);
+    const result = await handleConversation({ body, from, retailer, session });
+    await reply(await composeReply(result));
   } catch (err) {
     const detail = err?.error?.message || err.message;
     console.error("Handler error:", detail);

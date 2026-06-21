@@ -63,6 +63,18 @@ npm run verify:twilio-quota
 
 ---
 
+## Mariam's voice (the writer)
+
+Replies are written by Claude in Mariam's voice. All numbers (stock left, totals, prices) are still computed in code and passed to Claude as facts — Claude only phrases them, it never does the math. If the writer call errors, times out, or no Anthropic key is set, the bot sends a fixed template instead, so replies never fail.
+
+| Variable | Example | What it does |
+|----------|---------|--------------|
+| `MARIAM_WRITER_ENABLED` | `false` | Set `false` to use fixed templates only (no second Claude call). Default (unset) = on. |
+
+Cost/latency note: with the writer on, each meaningful reply makes **one extra Haiku call** (short, ~200 tokens, 4s timeout). Turn it off with `MARIAM_WRITER_ENABLED=false` to instantly revert to templates.
+
+---
+
 ## One-time setup
 
 ### Step 1 — Put code on GitHub
@@ -95,6 +107,7 @@ In Render → **Environment** → add each variable (Pro credentials for product
 | `TWILIO_WHATSAPP_NUMBER` | **Pro** WhatsApp sender |
 | `ANTHROPIC_API_KEY` | Same as local |
 | `ANTHROPIC_MODEL` | `claude-haiku-4-5-20251001` (optional) |
+| `MARIAM_WRITER_ENABLED` | `false` to disable Claude-written replies (optional, default on) |
 | `PUBLIC_WEBHOOK_BASE_URL` | `https://ghana-retail-bot.onrender.com` (no trailing slash, no `/webhook`) |
 | `DAILY_FREE_LIMIT` | e.g. `10` |
 | `UNLIMITED_USERS` | Comma-separated tester phones |

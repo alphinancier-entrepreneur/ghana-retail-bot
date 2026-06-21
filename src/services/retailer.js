@@ -30,7 +30,7 @@ async function getOrCreateRetailer(whatsappFrom) {
         .update({ consent_given_at: new Date().toISOString() })
         .eq("id", existing.id);
     }
-    return existing;
+    return { ...existing, isNew: false };
   }
 
   const { data: created, error: createError } = await supabase
@@ -47,7 +47,23 @@ async function getOrCreateRetailer(whatsappFrom) {
 
   if (settingsError) throw new Error(settingsError.message);
 
-  return created;
+  return { ...created, isNew: true };
+}
+
+async function setRetailerName(retailerId, name) {
+  const clean = (name || "").trim().slice(0, 60);
+  if (!clean) return null;
+
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("retailers")
+    .update({ name: clean })
+    .eq("id", retailerId)
+    .select("id, phone, name")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data;
 }
 
 async function getRetailerSettings(retailerId) {
@@ -62,4 +78,9 @@ async function getRetailerSettings(retailerId) {
   return data;
 }
 
-module.exports = { normalizeWhatsAppPhone, getOrCreateRetailer, getRetailerSettings };
+module.exports = {
+  normalizeWhatsAppPhone,
+  getOrCreateRetailer,
+  setRetailerName,
+  getRetailerSettings,
+};
